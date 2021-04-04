@@ -1,4 +1,10 @@
-pub mod object_path;
+#[macro_use]
+extern crate num_derive;
+extern crate num_traits;
+
+mod object_path;
+mod properties;
+mod types;
 
 use std::io::{BufReader, Read, Seek};
 
@@ -8,8 +14,7 @@ pub struct TdmsFile<T: Read + Seek> {
 
 impl<T: Read + Seek> TdmsFile<T> {
     pub fn new(reader: T) -> TdmsFile<T> {
-        TdmsFile {
-            reader: BufReader::new(reader),
-        }
+        let reader = BufReader::new(reader);
+        TdmsFile { reader }
     }
 }

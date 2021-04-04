@@ -68,6 +68,7 @@ fn it_does_stuff() {
     metadata_bytes.extend(&(3_u32.to_le_bytes())); // Data type
     metadata_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
     metadata_bytes.extend(&(3_u64.to_le_bytes())); // Number of values
+
     // Number of properties
     metadata_bytes.extend(&(0_u32.to_le_bytes()));
 
