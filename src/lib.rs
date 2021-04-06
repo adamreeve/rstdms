@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate num_derive;
 extern crate num_traits;
-extern crate thiserror;
 
 mod error;
 mod object_path;

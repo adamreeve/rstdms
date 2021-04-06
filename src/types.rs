@@ -1,5 +1,5 @@
-use std::io::Read;
 use crate::error::Result;
+use std::io::Read;
 
 #[derive(FromPrimitive, Debug)]
 #[repr(u32)]

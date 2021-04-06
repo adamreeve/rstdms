@@ -1,5 +1,5 @@
-use num_traits::FromPrimitive;
 use crate::error::{Result, TdmsReadError};
+use num_traits::FromPrimitive;
 
 use crate::types::{TdsType, TypeReader};
 
@@ -46,7 +46,10 @@ impl TdmsProperty {
             let value = read_value(type_id, reader)?;
             Ok(TdmsProperty { name, value })
         } else {
-            Err(TdmsReadError::TdmsError(format!("Invalid type id: {}", type_id_raw)))
+            Err(TdmsReadError::TdmsError(format!(
+                "Invalid type id: {}",
+                type_id_raw
+            )))
         }
     }
 }
@@ -111,7 +114,7 @@ mod test {
         let error = TdmsProperty::read(&mut reader).unwrap_err();
 
         match error {
-            TdmsReadError::IoError(_) => {},
+            TdmsReadError::IoError(_) => {}
             _ => panic!("Unexpected error variant"),
         }
     }
@@ -128,7 +131,7 @@ mod test {
         let error = TdmsProperty::read(&mut reader).unwrap_err();
 
         match error {
-            TdmsReadError::Utf8Error(_) => {},
+            TdmsReadError::Utf8Error(_) => {}
             _ => panic!("Unexpected error variant"),
         }
     }
