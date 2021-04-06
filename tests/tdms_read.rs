@@ -19,7 +19,7 @@ impl TestFile {
         self.bytes.extend(&hex!("54 44 53 6D"));
 
         // ToC mask
-        let toc_mask: u32 = (1 << 1) & (1 << 2) & (1 << 3);
+        let toc_mask: u32 = (1 << 1) | (1 << 2) | (1 << 3);
         self.bytes.extend(&toc_mask.to_le_bytes());
 
         // Version number
@@ -44,7 +44,7 @@ fn write_string(string: &str, bytes: &mut Vec<u8>) {
 }
 
 #[test]
-fn it_does_stuff() {
+fn read_metadata() {
     let mut metadata_bytes = Vec::new();
 
     // Number of objects
@@ -80,5 +80,7 @@ fn it_does_stuff() {
     let mut test_file = TestFile::new();
     test_file.add_segment(&metadata_bytes, &data_bytes);
 
-    let _tdms_file = TdmsFile::new(test_file.to_cursor());
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(tdms_file.is_ok());
 }
