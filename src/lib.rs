@@ -5,6 +5,7 @@ extern crate num_traits;
 mod error;
 mod object_path;
 mod properties;
+mod tdms_reader;
 mod types;
 
 use std::io::{BufReader, Read, Seek};

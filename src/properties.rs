@@ -66,7 +66,7 @@ mod test {
 
     #[test]
     pub fn can_read_int32_property() {
-        let cursor = Cursor::new(hex!(
+        let mut cursor = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
@@ -74,7 +74,7 @@ mod test {
             0A 00 00 00
             "
         ));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let property = TdmsProperty::read(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
@@ -83,7 +83,7 @@ mod test {
 
     #[test]
     pub fn can_read_string_property() {
-        let cursor = Cursor::new(hex!(
+        let mut cursor = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
@@ -92,7 +92,7 @@ mod test {
             70 72 6F 70 65 72 74 79 20 76 61 6C 75 65
             "
         ));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let property = TdmsProperty::read(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
@@ -104,13 +104,13 @@ mod test {
 
     #[test]
     pub fn unexpected_end_of_data() {
-        let cursor = Cursor::new(hex!(
+        let mut cursor = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72
             "
         ));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let error = TdmsProperty::read(&mut reader).unwrap_err();
 
         match error {
@@ -121,13 +121,13 @@ mod test {
 
     #[test]
     pub fn invalid_utf8() {
-        let cursor = Cursor::new(hex!(
+        let mut cursor = Cursor::new(hex!(
             "
             0D 00 00 00
             FF FF FF FF FF FF FF FF FF FF FF FF FF
             "
         ));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let error = TdmsProperty::read(&mut reader).unwrap_err();
 
         match error {

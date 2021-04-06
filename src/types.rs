@@ -42,21 +42,17 @@ pub trait TypeReader {
     fn read_string(&mut self) -> Result<String>;
 }
 
-pub struct LittleEndianReader<T: Read> {
-    reader: T,
+pub struct LittleEndianReader<'a, T: Read> {
+    reader: &'a mut T,
 }
 
-impl<T: Read> LittleEndianReader<T> {
-    pub fn new(reader: T) -> LittleEndianReader<T> {
+impl<'a, T: Read> LittleEndianReader<'a, T> {
+    pub fn new(reader: &'a mut T) -> LittleEndianReader<'a, T> {
         LittleEndianReader { reader }
     }
-
-    pub fn into_inner(self) -> T {
-        self.reader
-    }
 }
 
-impl<T: Read> TypeReader for LittleEndianReader<T> {
+impl<'a, T: Read> TypeReader for LittleEndianReader<'a, T> {
     fn read_int8(&mut self) -> Result<i8> {
         let mut buffer = [0; 1];
         self.reader.read_exact(&mut buffer)?;
@@ -139,8 +135,8 @@ mod test {
 
     #[test]
     pub fn can_read_int8_le() {
-        let cursor = Cursor::new(hex!("FE"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_int8().unwrap();
 
         assert_eq!(value, -2i8);
@@ -148,8 +144,8 @@ mod test {
 
     #[test]
     pub fn can_read_int16_le() {
-        let cursor = Cursor::new(hex!("FE FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_int16().unwrap();
 
         assert_eq!(value, -2i16);
@@ -157,8 +153,8 @@ mod test {
 
     #[test]
     pub fn can_read_int32_le() {
-        let cursor = Cursor::new(hex!("FE FF FF FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF FF FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_int32().unwrap();
 
         assert_eq!(value, -2i32);
@@ -166,8 +162,8 @@ mod test {
 
     #[test]
     pub fn can_read_int64_le() {
-        let cursor = Cursor::new(hex!("FE FF FF FF FF FF FF FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF FF FF FF FF FF FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_int64().unwrap();
 
         assert_eq!(value, -2i64);
@@ -175,8 +171,8 @@ mod test {
 
     #[test]
     pub fn can_read_uint8_le() {
-        let cursor = Cursor::new(hex!("FE"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_uint8().unwrap();
 
         assert_eq!(value, 254u8);
@@ -184,8 +180,8 @@ mod test {
 
     #[test]
     pub fn can_read_uint16_le() {
-        let cursor = Cursor::new(hex!("FE FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_uint16().unwrap();
 
         assert_eq!(value, 65534u16);
@@ -193,8 +189,8 @@ mod test {
 
     #[test]
     pub fn can_read_uint32_le() {
-        let cursor = Cursor::new(hex!("FE FF FF FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF FF FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_uint32().unwrap();
 
         assert_eq!(value, 4294967294u32);
@@ -202,8 +198,8 @@ mod test {
 
     #[test]
     pub fn can_read_uint64_le() {
-        let cursor = Cursor::new(hex!("FE FF FF FF FF FF FF FF"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("FE FF FF FF FF FF FF FF"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_uint64().unwrap();
 
         assert_eq!(value, 18446744073709551614u64);
@@ -211,8 +207,8 @@ mod test {
 
     #[test]
     pub fn can_read_float32_le() {
-        let cursor = Cursor::new(hex!("A4 70 45 41"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("A4 70 45 41"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_float32().unwrap();
 
         assert_eq!(value, 12.34f32);
@@ -220,8 +216,8 @@ mod test {
 
     #[test]
     pub fn can_read_float64_le() {
-        let cursor = Cursor::new(hex!("AE 47 E1 7A 14 AE 28 40"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("AE 47 E1 7A 14 AE 28 40"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_float64().unwrap();
 
         assert_eq!(value, 12.34f64);
@@ -229,8 +225,8 @@ mod test {
 
     #[test]
     pub fn can_read_string_le() {
-        let cursor = Cursor::new(hex!("05 00 00 00 68 65 6C 6C 6F"));
-        let mut reader = LittleEndianReader::new(cursor);
+        let mut cursor = Cursor::new(hex!("05 00 00 00 68 65 6C 6C 6F"));
+        let mut reader = LittleEndianReader::new(&mut cursor);
         let value = reader.read_string().unwrap();
 
         assert_eq!(value, "hello");
