@@ -1,5 +1,6 @@
 use crate::error::{Result, TdmsReadError};
 use crate::properties::TdmsProperty;
+use crate::toc::{TocFlag, TocMask};
 use crate::types::{LittleEndianReader, TypeReader};
 use std::collections::HashMap;
 use std::io::{Read, Seek};
@@ -47,7 +48,7 @@ fn read_segment<T: Read + Seek>(
     }
 
     let mut type_reader = LittleEndianReader::new(reader);
-    let toc_mask = type_reader.read_uint32()?;
+    let toc_mask = TocMask::from_flags(type_reader.read_uint32()?);
 
     // TODO: Check endianness from ToC mask
     let mut type_reader = LittleEndianReader::new(reader);
@@ -58,6 +59,8 @@ fn read_segment<T: Read + Seek>(
 
     println!("Read segment with toc_mask = {}, version = {}, next_segment_offset = {}, raw_data_offset = {}",
             toc_mask, version, next_segment_offset, raw_data_offset);
+
+    if toc_mask.has_flag(TocFlag::MetaData) {}
 
     Ok(Some(()))
 }

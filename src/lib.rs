@@ -6,6 +6,7 @@ mod error;
 mod object_path;
 mod properties;
 mod tdms_reader;
+mod toc;
 mod types;
 
 use crate::error::Result;
