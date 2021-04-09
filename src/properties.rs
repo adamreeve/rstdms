@@ -1,5 +1,5 @@
 use crate::error::{Result, TdmsReadError};
-use num_traits::FromPrimitive;
+use std::convert::TryFrom;
 
 use crate::types::{TdsType, TypeReader};
 
@@ -41,8 +41,8 @@ impl TdmsProperty {
     pub fn read<T: TypeReader>(reader: &mut T) -> Result<TdmsProperty> {
         let name = reader.read_string()?;
         let type_id_raw = reader.read_uint32()?;
-        let type_id = FromPrimitive::from_u32(type_id_raw);
-        if let Some(type_id) = type_id {
+        let type_id = TdsType::try_from(type_id_raw);
+        if let Ok(type_id) = type_id {
             let value = read_value(type_id, reader)?;
             Ok(TdmsProperty { name, value })
         } else {

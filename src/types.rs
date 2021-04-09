@@ -1,7 +1,8 @@
 use crate::error::Result;
+use num_enum::TryFromPrimitive;
 use std::io::Read;
 
-#[derive(FromPrimitive, Debug)]
+#[derive(TryFromPrimitive, Debug)]
 #[repr(u32)]
 pub enum TdsType {
     Void = 0,

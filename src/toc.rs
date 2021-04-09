@@ -1,6 +1,6 @@
-use num_traits::ToPrimitive;
+use num_enum::IntoPrimitive;
 
-#[derive(FromPrimitive, ToPrimitive, Debug)]
+#[derive(IntoPrimitive, Debug)]
 #[repr(u32)]
 pub enum TocFlag {
     MetaData = 1 << 1,
@@ -22,7 +22,7 @@ impl TocMask {
     }
 
     pub fn has_flag(&self, flag: TocFlag) -> bool {
-        let flag_val = flag.to_u32().unwrap();
+        let flag_val: u32 = flag.into();
         (self.flags & flag_val) == flag_val
     }
 }
