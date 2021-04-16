@@ -4,6 +4,7 @@ use std::collections::HashMap;
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ObjectPathId(u32);
 
+#[derive(Debug)]
 pub struct ObjectPathCache {
     path_to_id: HashMap<String, ObjectPathId>,
     next_id: u32,

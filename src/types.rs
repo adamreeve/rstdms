@@ -1,8 +1,9 @@
-use crate::error::Result;
+use crate::error::{Result, TdmsReadError};
 use num_enum::TryFromPrimitive;
+use std::convert::TryFrom;
 use std::io::Read;
 
-#[derive(TryFromPrimitive, Debug)]
+#[derive(TryFromPrimitive, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum TdsType {
     Void = 0,
@@ -27,6 +28,39 @@ pub enum TdsType {
     ComplexSingleFloat = 0x08000C,
     ComplexDoubleFloat = 0x10000D,
     DaqmxRawData = 0xFFFFFFFF,
+}
+
+impl TdsType {
+    pub fn from_u32(type_id_raw: u32) -> Result<TdsType> {
+        TdsType::try_from(type_id_raw).map_err(|_| TdmsReadError::TdmsError(format!("Invalid type id: {}", type_id_raw)))
+    }
+
+    pub fn size(&self) -> Option<u32> {
+        match *self {
+            TdsType::Void => Some(0),
+            TdsType::I8 => Some(1),
+            TdsType::I16 => Some(2),
+            TdsType::I32 => Some(4),
+            TdsType::I64 => Some(8),
+            TdsType::U8 => Some(1),
+            TdsType::U16 => Some(2),
+            TdsType::U32 => Some(4),
+            TdsType::U64 => Some(8),
+            TdsType::SingleFloat => Some(4),
+            TdsType::DoubleFloat => Some(8),
+            TdsType::ExtendedFloat => Some(16),
+            TdsType::SingleFloatWithUnit => Some(4),
+            TdsType::DoubleFloatWithUnit => Some(8),
+            TdsType::ExtendedFloatWithUnit => Some(16),
+            TdsType::String => None,
+            TdsType::Boolean => Some(1),
+            TdsType::TimeStamp => Some(16),
+            TdsType::FixedPoint => None,
+            TdsType::ComplexSingleFloat => Some(8),
+            TdsType::ComplexDoubleFloat => Some(16),
+            TdsType::DaqmxRawData => None,
+        }
+    }
 }
 
 pub trait TypeReader {

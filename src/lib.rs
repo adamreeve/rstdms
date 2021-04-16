@@ -1,4 +1,5 @@
 extern crate num_enum;
+extern crate typed_arena;
 
 mod error;
 mod object_path;
@@ -11,6 +12,7 @@ use crate::error::Result;
 use crate::tdms_reader::{read_metadata, TdmsMetadata};
 use std::io::{BufReader, Read, Seek};
 
+#[derive(Debug)]
 pub struct TdmsFile<T: Read + Seek> {
     pub reader: BufReader<T>,
     pub metadata: TdmsMetadata,

@@ -1,5 +1,4 @@
-use crate::error::{Result, TdmsReadError};
-use std::convert::TryFrom;
+use crate::error::Result;
 
 use crate::types::{TdsType, TypeReader};
 
@@ -41,16 +40,9 @@ impl TdmsProperty {
     pub fn read<T: TypeReader>(reader: &mut T) -> Result<TdmsProperty> {
         let name = reader.read_string()?;
         let type_id_raw = reader.read_uint32()?;
-        let type_id = TdsType::try_from(type_id_raw);
-        if let Ok(type_id) = type_id {
-            let value = read_value(type_id, reader)?;
-            Ok(TdmsProperty { name, value })
-        } else {
-            Err(TdmsReadError::TdmsError(format!(
-                "Invalid type id: {}",
-                type_id_raw
-            )))
-        }
+        let type_id = TdsType::from_u32(type_id_raw)?;
+        let value = read_value(type_id, reader)?;
+        Ok(TdmsProperty { name, value })
     }
 }
 
@@ -63,6 +55,7 @@ mod test {
 
     use super::*;
     use crate::types::LittleEndianReader;
+    use crate::error::TdmsReadError;
 
     #[test]
     pub fn can_read_int32_property() {

@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 num_enum = "0.5.1"
+typed-arena = "2.0.1"
 
 [dev-dependencies]
 hex-literal = "0.3.1"
-

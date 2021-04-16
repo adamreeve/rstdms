@@ -31,6 +31,9 @@ impl TestFile {
         self.bytes
             .extend(&(next_segment_offset as u64).to_le_bytes());
         self.bytes.extend(&(raw_data_offset as u64).to_le_bytes());
+
+        self.bytes.extend(metadata_bytes);
+        self.bytes.extend(data_bytes);
     }
 
     fn to_cursor(self) -> Cursor<Vec<u8>> {
@@ -82,5 +85,5 @@ fn read_metadata() {
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
-    assert!(tdms_file.is_ok());
+    assert!(tdms_file.is_ok(), format!("Got error: {:?}", tdms_file.unwrap_err()));
 }
