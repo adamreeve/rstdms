@@ -134,8 +134,8 @@ fn read_metadata_with_repeated_raw_data_index() {
     metadata_bytes.extend(&(1_u32.to_le_bytes()));
     // Object path
     write_string("/'Group'/'Channel1'", &mut metadata_bytes);
-    // Raw data index
-    metadata_bytes.extend(&(0_u32.to_le_bytes())); // Raw data index matches previous
+    // Raw data index matches previous
+    metadata_bytes.extend(&(0_u32.to_le_bytes()));
     // Number of properties
     metadata_bytes.extend(&(0_u32.to_le_bytes()));
 

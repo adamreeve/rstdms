@@ -13,7 +13,7 @@ const FORMAT_CHANGING_SCALER: u32 = 0x00001269;
 const DIGITAL_LINE_SCALER: u32 = 0x0000126A;
 
 #[derive(Debug)]
-pub struct TdmsSegment {
+struct TdmsSegment {
     data_position: u64,
     next_segment_position: u64,
     objects: Vec<SegmentObject>,
@@ -34,7 +34,7 @@ impl TdmsSegment {
 }
 
 #[derive(Debug)]
-pub struct SegmentObject {
+struct SegmentObject {
     pub object_id: ObjectPathId,
     pub raw_data_index: Option<RawDataIndexId>,
 }
@@ -58,13 +58,13 @@ impl SegmentObject {
 type RawDataIndexId = Id<RawDataIndex>;
 
 #[derive(Debug)]
-pub struct RawDataIndex {
+struct RawDataIndex {
     pub number_of_values: u64,
     pub data_type: TdsType,
     pub data_size: u64,
 }
 
-pub struct RawDataIndexCache {
+struct RawDataIndexCache {
     prev_raw_data_indexes: Vec<Option<RawDataIndexId>>,
 }
 
@@ -102,6 +102,7 @@ pub struct TdmsReader {
     object_paths: ObjectPathCache,
     data_indexes: Arena<RawDataIndex>,
     raw_data_index_cache: RawDataIndexCache,
+    segments: Vec<TdmsSegment>,
 }
 
 impl TdmsReader {
@@ -111,7 +112,27 @@ impl TdmsReader {
             object_paths: ObjectPathCache::new(),
             data_indexes: Arena::<RawDataIndex>::new(),
             raw_data_index_cache: RawDataIndexCache::new(),
+            segments: Vec::new(),
         }
+    }
+
+    fn read_segments<T: Read + Seek>(&mut self, reader: &mut T) -> Result<()> {
+        loop {
+            let position = reader.seek(SeekFrom::Current(0))?;
+            match self.read_segment(reader, position) {
+                Err(e) => return Err(e),
+                Ok(None) => {
+                    // Reached end of file
+                    break;
+                }
+                Ok(Some(segment)) => {
+                    // Seek to the start of the next segment
+                    reader.seek(SeekFrom::Start(segment.next_segment_position))?;
+                    self.segments.push(segment);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn read_segment<T: Read + Seek>(
@@ -223,21 +244,10 @@ impl TdmsReader {
 
 pub fn read_metadata<T: Read + Seek>(reader: &mut T) -> Result<TdmsReader> {
     let mut tdms_reader = TdmsReader::new();
-    loop {
-        let position = reader.seek(SeekFrom::Current(0))?;
-        match tdms_reader.read_segment(reader, position) {
-            Err(e) => return Err(e),
-            Ok(None) => {
-                // Reached end of file
-                break;
-            }
-            Ok(Some(segment)) => {
-                // Seek to the start of the next segment
-                reader.seek(SeekFrom::Start(segment.next_segment_position))?;
-            }
-        }
+    match tdms_reader.read_segments(reader) {
+        Ok(()) => Ok(tdms_reader),
+        Err(e) => Err(e),
     }
-    Ok(tdms_reader)
 }
 
 fn read_raw_data_index<T: TypeReader>(reader: &mut T) -> Result<RawDataIndex> {

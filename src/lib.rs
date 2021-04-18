@@ -13,8 +13,8 @@ use crate::tdms_reader::{read_metadata, TdmsReader};
 use std::io::{BufReader, Read, Seek};
 
 pub struct TdmsFile<T: Read + Seek> {
-    pub reader: BufReader<T>,
-    pub metadata: TdmsReader,
+    _reader: BufReader<T>,
+    _metadata: TdmsReader,
 }
 
 impl<T: Read + Seek> std::fmt::Debug for TdmsFile<T> {
@@ -27,6 +27,9 @@ impl<T: Read + Seek> TdmsFile<T> {
     pub fn new(reader: T) -> Result<TdmsFile<T>> {
         let mut reader = BufReader::new(reader);
         let metadata = read_metadata(&mut reader)?;
-        Ok(TdmsFile { reader, metadata })
+        Ok(TdmsFile {
+            _reader: reader,
+            _metadata: metadata,
+        })
     }
 }

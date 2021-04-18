@@ -1,8 +1,8 @@
-use crate::error::Result;
+use crate::error::{Result, TdmsReadError};
 
 use crate::types::{TdsType, TypeReader};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum TdmsValue {
     Int8(i8),
     Int16(i16),
@@ -12,10 +12,12 @@ pub enum TdmsValue {
     Uint16(u16),
     Uint32(u32),
     Uint64(u64),
+    Float32(f32),
+    Float64(f64),
     String(String),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct TdmsProperty {
     pub name: String,
     pub value: TdmsValue,
@@ -31,8 +33,13 @@ fn read_value<T: TypeReader>(type_id: TdsType, reader: &mut T) -> Result<TdmsVal
         TdsType::U16 => Ok(TdmsValue::Uint16(reader.read_uint16()?)),
         TdsType::U32 => Ok(TdmsValue::Uint32(reader.read_uint32()?)),
         TdsType::U64 => Ok(TdmsValue::Uint64(reader.read_uint64()?)),
+        TdsType::SingleFloat => Ok(TdmsValue::Float32(reader.read_float32()?)),
+        TdsType::DoubleFloat => Ok(TdmsValue::Float64(reader.read_float64()?)),
         TdsType::String => Ok(TdmsValue::String(reader.read_string()?)),
-        _ => panic!("Unsupported type {:?}", type_id),
+        _ => Err(TdmsReadError::TdmsError(format!(
+            "Unsupported property type {:?}",
+            type_id
+        ))),
     }
 }
 
