@@ -54,8 +54,8 @@ mod test {
     use std::io::Cursor;
 
     use super::*;
-    use crate::types::LittleEndianReader;
     use crate::error::TdmsReadError;
+    use crate::types::LittleEndianReader;
 
     #[test]
     pub fn can_read_int32_property() {

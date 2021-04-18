@@ -32,7 +32,8 @@ pub enum TdsType {
 
 impl TdsType {
     pub fn from_u32(type_id_raw: u32) -> Result<TdsType> {
-        TdsType::try_from(type_id_raw).map_err(|_| TdmsReadError::TdmsError(format!("Invalid type id: {}", type_id_raw)))
+        TdsType::try_from(type_id_raw)
+            .map_err(|_| TdmsReadError::TdmsError(format!("Invalid type id: {}", type_id_raw)))
     }
 
     pub fn size(&self) -> Option<u32> {
