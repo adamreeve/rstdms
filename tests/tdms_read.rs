@@ -90,3 +90,61 @@ fn read_metadata() {
         format!("Got error: {:?}", tdms_file.unwrap_err())
     );
 }
+
+#[test]
+fn read_metadata_with_repeated_raw_data_index() {
+    let mut metadata_bytes = Vec::new();
+
+    // Number of objects
+    metadata_bytes.extend(&(2_u32.to_le_bytes()));
+
+    // Object path
+    write_string("/", &mut metadata_bytes);
+    // Raw data index
+    metadata_bytes.extend(&hex!("FF FF FF FF"));
+    // Number of properties
+    metadata_bytes.extend(&(1_u32.to_le_bytes()));
+    // Property
+    write_string("test_property", &mut metadata_bytes);
+    metadata_bytes.extend(&(3_u32.to_le_bytes()));
+    metadata_bytes.extend(&(10_i32.to_le_bytes()));
+
+    // Object path
+    write_string("/'Group'/'Channel1'", &mut metadata_bytes);
+    // Raw data index
+    metadata_bytes.extend(&(20_u32.to_le_bytes())); // Raw data index length
+    metadata_bytes.extend(&(3_u32.to_le_bytes())); // Data type
+    metadata_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
+    metadata_bytes.extend(&(3_u64.to_le_bytes())); // Number of values
+
+    // Number of properties
+    metadata_bytes.extend(&(0_u32.to_le_bytes()));
+
+    let mut data_bytes = Vec::new();
+    data_bytes.extend(&(1_i32.to_le_bytes()));
+    data_bytes.extend(&(2_i32.to_le_bytes()));
+    data_bytes.extend(&(3_i32.to_le_bytes()));
+
+    let mut test_file = TestFile::new();
+    test_file.add_segment(&metadata_bytes, &data_bytes);
+
+    metadata_bytes.clear();
+
+    // Number of objects
+    metadata_bytes.extend(&(1_u32.to_le_bytes()));
+    // Object path
+    write_string("/'Group'/'Channel1'", &mut metadata_bytes);
+    // Raw data index
+    metadata_bytes.extend(&(0_u32.to_le_bytes())); // Raw data index matches previous
+    // Number of properties
+    metadata_bytes.extend(&(0_u32.to_le_bytes()));
+
+    test_file.add_segment(&metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(
+        tdms_file.is_ok(),
+        format!("Got error: {:?}", tdms_file.unwrap_err())
+    );
+}
