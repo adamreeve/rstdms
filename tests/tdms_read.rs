@@ -4,7 +4,6 @@ use hex_literal::hex;
 use std::io::Cursor;
 
 use rstdms::TdmsFile;
-use typed_arena::Arena;
 
 struct TestFile {
     bytes: Vec<u8>,
@@ -84,8 +83,7 @@ fn read_metadata() {
     let mut test_file = TestFile::new();
     test_file.add_segment(&metadata_bytes, &data_bytes);
 
-    let arena = Arena::new();
-    let tdms_file = TdmsFile::new(test_file.to_cursor(), &arena);
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
 
     assert!(
         tdms_file.is_ok(),

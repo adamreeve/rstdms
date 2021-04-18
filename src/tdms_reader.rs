@@ -3,9 +3,9 @@ use crate::object_path::{ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
 use crate::toc::{TocFlag, TocMask};
 use crate::types::{LittleEndianReader, TdsType, TypeReader};
+use id_arena::{Arena, Id};
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
-use typed_arena::Arena;
 
 const RAW_DATA_INDEX_NO_DATA: u32 = 0xFFFFFFFF;
 const RAW_DATA_INDEX_MATCHES_PREVIOUS: u32 = 0x00000000;
@@ -13,18 +13,18 @@ const FORMAT_CHANGING_SCALER: u32 = 0x00001269;
 const DIGITAL_LINE_SCALER: u32 = 0x0000126A;
 
 #[derive(Debug)]
-pub struct TdmsSegment<'a> {
+pub struct TdmsSegment {
     data_position: u64,
     next_segment_position: u64,
-    objects: Vec<SegmentObject<'a>>,
+    objects: Vec<SegmentObject>,
 }
 
-impl<'a> TdmsSegment<'a> {
+impl TdmsSegment {
     fn new(
         data_position: u64,
         next_segment_position: u64,
-        objects: Vec<SegmentObject<'a>>,
-    ) -> TdmsSegment<'a> {
+        objects: Vec<SegmentObject>,
+    ) -> TdmsSegment {
         TdmsSegment {
             data_position,
             next_segment_position,
@@ -34,29 +34,28 @@ impl<'a> TdmsSegment<'a> {
 }
 
 #[derive(Debug)]
-pub struct SegmentObject<'a> {
+pub struct SegmentObject {
     pub object_id: ObjectPathId,
-    pub raw_data_index: Option<&'a RawDataIndex>,
+    pub raw_data_index: Option<RawDataIndexId>,
 }
 
-impl<'a> SegmentObject<'a> {
-    pub fn no_data(object_id: ObjectPathId) -> SegmentObject<'a> {
+impl SegmentObject {
+    pub fn no_data(object_id: ObjectPathId) -> SegmentObject {
         SegmentObject {
             object_id,
             raw_data_index: None,
         }
     }
 
-    pub fn with_data(
-        object_id: ObjectPathId,
-        raw_data_index: &'a RawDataIndex,
-    ) -> SegmentObject<'a> {
+    pub fn with_data(object_id: ObjectPathId, raw_data_index: RawDataIndexId) -> SegmentObject {
         SegmentObject {
             object_id,
             raw_data_index: Some(raw_data_index),
         }
     }
 }
+
+type RawDataIndexId = Id<RawDataIndex>;
 
 #[derive(Debug)]
 pub struct RawDataIndex {
@@ -65,18 +64,18 @@ pub struct RawDataIndex {
     pub data_size: u64,
 }
 
-pub struct RawDataIndexCache<'a> {
-    prev_raw_data_indexes: Vec<Option<&'a RawDataIndex>>,
+pub struct RawDataIndexCache {
+    prev_raw_data_indexes: Vec<Option<RawDataIndexId>>,
 }
 
-impl<'a> RawDataIndexCache<'a> {
-    fn new() -> RawDataIndexCache<'a> {
+impl RawDataIndexCache {
+    fn new() -> RawDataIndexCache {
         RawDataIndexCache {
             prev_raw_data_indexes: Vec::new(),
         }
     }
 
-    fn set_raw_data_index(&mut self, object: ObjectPathId, raw_data_index: &'a RawDataIndex) {
+    fn set_raw_data_index(&mut self, object: ObjectPathId, raw_data_index: RawDataIndexId) {
         let index = object.as_usize();
         if index >= self.prev_raw_data_indexes.len() {
             let padding_length = index - self.prev_raw_data_indexes.len();
@@ -90,7 +89,7 @@ impl<'a> RawDataIndexCache<'a> {
         }
     }
 
-    fn get_raw_data_index(&self, object: ObjectPathId) -> Option<&'a RawDataIndex> {
+    fn get_raw_data_index(&self, object: ObjectPathId) -> Option<RawDataIndexId> {
         match self.prev_raw_data_indexes.get(object.as_usize()) {
             Some(option) => *option,
             _ => None,
@@ -98,19 +97,19 @@ impl<'a> RawDataIndexCache<'a> {
     }
 }
 
-pub struct TdmsReader<'a> {
+pub struct TdmsReader {
     pub properties: HashMap<ObjectPathId, Vec<TdmsProperty>>,
     object_paths: ObjectPathCache,
-    data_indexes: &'a Arena<RawDataIndex>,
-    raw_data_index_cache: RawDataIndexCache<'a>,
+    data_indexes: Arena<RawDataIndex>,
+    raw_data_index_cache: RawDataIndexCache,
 }
 
-impl<'a> TdmsReader<'a> {
-    fn new(arena: &'a Arena<RawDataIndex>) -> TdmsReader<'a> {
+impl TdmsReader {
+    fn new() -> TdmsReader {
         TdmsReader {
             properties: HashMap::new(),
             object_paths: ObjectPathCache::new(),
-            data_indexes: arena,
+            data_indexes: Arena::<RawDataIndex>::new(),
             raw_data_index_cache: RawDataIndexCache::new(),
         }
     }
@@ -172,7 +171,7 @@ impl<'a> TdmsReader<'a> {
         &mut self,
         reader: &mut T,
         toc_mask: &TocMask,
-    ) -> Result<Vec<SegmentObject<'a>>> {
+    ) -> Result<Vec<SegmentObject>> {
         if !toc_mask.has_flag(TocFlag::NewObjList) {
             unimplemented!();
         }
@@ -187,8 +186,8 @@ impl<'a> TdmsReader<'a> {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
                 RAW_DATA_INDEX_MATCHES_PREVIOUS => {
                     match self.raw_data_index_cache.get_raw_data_index(object_id) {
-                        Some(ref raw_data_index) => {
-                            SegmentObject::with_data(object_id, raw_data_index)
+                        Some(raw_data_index_id) => {
+                            SegmentObject::with_data(object_id, raw_data_index_id)
                         }
                         None => {
                             return Err(TdmsReadError::TdmsError(format!(
@@ -222,11 +221,8 @@ impl<'a> TdmsReader<'a> {
     }
 }
 
-pub fn read_metadata<'a, T: Read + Seek>(
-    reader: &mut T,
-    arena: &'a Arena<RawDataIndex>,
-) -> Result<TdmsReader<'a>> {
-    let mut tdms_reader = TdmsReader::new(arena);
+pub fn read_metadata<T: Read + Seek>(reader: &mut T) -> Result<TdmsReader> {
+    let mut tdms_reader = TdmsReader::new();
     loop {
         let position = reader.seek(SeekFrom::Current(0))?;
         match tdms_reader.read_segment(reader, position) {
