@@ -33,7 +33,7 @@ impl TdmsSegment {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 struct SegmentObject {
     pub object_id: ObjectPathId,
     pub raw_data_index: Option<RawDataIndexId>,
@@ -178,7 +178,12 @@ impl TdmsReader {
         let segment_objects = if toc_mask.has_flag(TocFlag::MetaData) {
             self.read_object_metadata(&mut type_reader, &toc_mask)?
         } else {
-            unimplemented!();
+            // No meta data in this segment, re-use metadata from the previous segment
+            match self.previous_segment() {
+                // TODO: Share references to object vectors?
+                Some(segment) => segment.objects.to_vec(),
+                None => Vec::new(),
+            }
         };
 
         Ok(Some(TdmsSegment::new(
@@ -186,6 +191,15 @@ impl TdmsReader {
             next_segment_position,
             segment_objects,
         )))
+    }
+
+    fn previous_segment(&self) -> Option<&TdmsSegment> {
+        let segments_length = self.segments.len();
+        if segments_length > 0 {
+            Some(&self.segments[segments_length - 1])
+        } else {
+            None
+        }
     }
 
     fn read_object_metadata<T: TypeReader>(
