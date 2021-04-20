@@ -7,9 +7,7 @@ pub struct ObjectMap<T: Copy> {
 
 impl<T: Copy> ObjectMap<T> {
     pub fn new() -> ObjectMap<T> {
-        ObjectMap {
-            values: Vec::new(),
-        }
+        ObjectMap { values: Vec::new() }
     }
 
     /// Set a new value or overwrite an existing value
@@ -34,12 +32,17 @@ impl<T: Copy> ObjectMap<T> {
             _ => None,
         }
     }
+
+    /// Clear all values without changing the vector capacity
+    pub fn clear(&mut self) {
+        self.values.clear();
+    }
 }
 
 #[cfg(test)]
 mod test {
-use crate::object_path::ObjectPathCache;
     use super::*;
+    use crate::object_path::ObjectPathCache;
 
     #[test]
     fn set_and_get() {
@@ -72,5 +75,17 @@ use crate::object_path::ObjectPathCache;
         object_map.set(channel_1, 3);
 
         assert_eq!(object_map.get(channel_1), Some(3));
+    }
+
+    #[test]
+    fn clear() {
+        let mut path_cache = ObjectPathCache::new();
+        let channel_1 = path_cache.get_or_create_id(String::from("/'group'/'channel_1'"));
+
+        let mut object_map = ObjectMap::new();
+        object_map.set(channel_1, 2);
+        object_map.clear();
+
+        assert_eq!(object_map.get(channel_1), None);
     }
 }

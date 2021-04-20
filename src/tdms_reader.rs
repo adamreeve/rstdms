@@ -13,6 +13,14 @@ const RAW_DATA_INDEX_MATCHES_PREVIOUS: u32 = 0x00000000;
 const FORMAT_CHANGING_SCALER: u32 = 0x00001269;
 const DIGITAL_LINE_SCALER: u32 = 0x0000126A;
 
+pub fn read_metadata<T: Read + Seek>(reader: &mut T) -> Result<TdmsReader> {
+    let mut tdms_reader = TdmsReader::new();
+    match tdms_reader.read_segments(reader) {
+        Ok(()) => Ok(tdms_reader),
+        Err(e) => Err(e),
+    }
+}
+
 #[derive(Debug)]
 struct TdmsSegment {
     data_position: u64,
@@ -34,7 +42,7 @@ impl TdmsSegment {
     }
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 struct SegmentObject {
     pub object_id: ObjectPathId,
     pub raw_data_index: Option<RawDataIndexId>,
@@ -87,9 +95,10 @@ impl TdmsReader {
     }
 
     fn read_segments<T: Read + Seek>(&mut self, reader: &mut T) -> Result<()> {
+        let mut object_merger = ObjectMerger::new();
         loop {
             let position = reader.seek(SeekFrom::Current(0))?;
-            match self.read_segment(reader, position) {
+            match self.read_segment(reader, position, &mut object_merger) {
                 Err(e) => return Err(e),
                 Ok(None) => {
                     // Reached end of file
@@ -109,6 +118,7 @@ impl TdmsReader {
         &mut self,
         reader: &mut T,
         position: u64,
+        object_merger: &mut ObjectMerger,
     ) -> Result<Option<TdmsSegment>> {
         let mut header_bytes = [0u8; 4];
         let mut bytes_read = 0;
@@ -146,10 +156,17 @@ impl TdmsReader {
                 toc_mask, version, next_segment_offset, raw_data_offset);
 
         let segment_objects = if toc_mask.has_flag(TocFlag::MetaData) {
-            self.read_object_metadata(&mut type_reader, &toc_mask)?
+            let this_segment_objects = self.read_object_metadata(&mut type_reader)?;
+            if toc_mask.has_flag(TocFlag::NewObjList) {
+                this_segment_objects
+            } else {
+                // Not a new object list so merge with previous segment objects
+                let prev_objs = last_segment(&self.segments).map(|segment| &segment.objects);
+                object_merger.merge_objects(prev_objs, this_segment_objects)
+            }
         } else {
             // No meta data in this segment, re-use metadata from the previous segment
-            match self.previous_segment() {
+            match last_segment(&self.segments) {
                 // TODO: Share references to object vectors?
                 Some(segment) => segment.objects.to_vec(),
                 None => Vec::new(),
@@ -163,24 +180,10 @@ impl TdmsReader {
         )))
     }
 
-    fn previous_segment(&self) -> Option<&TdmsSegment> {
-        let segments_length = self.segments.len();
-        if segments_length > 0 {
-            Some(&self.segments[segments_length - 1])
-        } else {
-            None
-        }
-    }
-
     fn read_object_metadata<T: TypeReader>(
         &mut self,
         reader: &mut T,
-        toc_mask: &TocMask,
     ) -> Result<Vec<SegmentObject>> {
-        if !toc_mask.has_flag(TocFlag::NewObjList) {
-            unimplemented!();
-        }
-
         let num_objects = reader.read_uint32()?;
         let mut segment_objects = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
@@ -189,18 +192,16 @@ impl TdmsReader {
             let raw_data_index_header = reader.read_uint32()?;
             let segment_object = match raw_data_index_header {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
-                RAW_DATA_INDEX_MATCHES_PREVIOUS => {
-                    match self.raw_data_index_cache.get(object_id) {
-                        Some(raw_data_index_id) => {
-                            SegmentObject::with_data(object_id, raw_data_index_id)
-                        }
-                        None => {
-                            return Err(TdmsReadError::TdmsError(format!(
-                                "Object has no previous raw data index"
-                            )))
-                        }
+                RAW_DATA_INDEX_MATCHES_PREVIOUS => match self.raw_data_index_cache.get(object_id) {
+                    Some(raw_data_index_id) => {
+                        SegmentObject::with_data(object_id, raw_data_index_id)
                     }
-                }
+                    None => {
+                        return Err(TdmsReadError::TdmsError(format!(
+                            "Object has no previous raw data index"
+                        )))
+                    }
+                },
                 FORMAT_CHANGING_SCALER => unimplemented!(),
                 DIGITAL_LINE_SCALER => unimplemented!(),
                 _ => {
@@ -225,11 +226,46 @@ impl TdmsReader {
     }
 }
 
-pub fn read_metadata<T: Read + Seek>(reader: &mut T) -> Result<TdmsReader> {
-    let mut tdms_reader = TdmsReader::new();
-    match tdms_reader.read_segments(reader) {
-        Ok(()) => Ok(tdms_reader),
-        Err(e) => Err(e),
+struct ObjectMerger {
+    object_indexes: ObjectMap<usize>,
+}
+
+impl ObjectMerger {
+    pub fn new() -> ObjectMerger {
+        ObjectMerger {
+            object_indexes: ObjectMap::new(),
+        }
+    }
+
+    /// Combine previous segment's object list with objects in the current segment
+    pub fn merge_objects(
+        &mut self,
+        previous_segment_objects: Option<&Vec<SegmentObject>>,
+        new_objects: Vec<SegmentObject>,
+    ) -> Vec<SegmentObject> {
+        if let Some(prev_objs) = previous_segment_objects {
+            let mut merged_objects = Vec::with_capacity(prev_objs.len());
+            // Store indexes of existing objects and add to merged vector
+            self.object_indexes.clear();
+            for (i, obj) in prev_objs.iter().enumerate() {
+                self.object_indexes.set(obj.object_id, i);
+                merged_objects.push(obj.clone());
+            }
+            // Replace or push new objects
+            for obj in new_objects {
+                match self.object_indexes.get(obj.object_id) {
+                    Some(i) => {
+                        merged_objects[i] = obj;
+                    }
+                    None => {
+                        merged_objects.push(obj);
+                    }
+                }
+            }
+            merged_objects
+        } else {
+            new_objects
+        }
     }
 }
 
@@ -264,4 +300,13 @@ fn read_raw_data_index<T: TypeReader>(reader: &mut T) -> Result<RawDataIndex> {
         data_type,
         data_size,
     })
+}
+
+fn last_segment(segments: &Vec<TdmsSegment>) -> Option<&TdmsSegment> {
+    let segments_length = segments.len();
+    if segments_length > 0 {
+        Some(&segments[segments_length - 1])
+    } else {
+        None
+    }
 }
