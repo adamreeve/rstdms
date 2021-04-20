@@ -2,6 +2,7 @@ extern crate id_arena;
 extern crate num_enum;
 
 mod error;
+mod object_map;
 mod object_path;
 mod properties;
 mod tdms_reader;

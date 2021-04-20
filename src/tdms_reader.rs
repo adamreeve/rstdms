@@ -1,4 +1,5 @@
 use crate::error::{Result, TdmsReadError};
+use crate::object_map::ObjectMap;
 use crate::object_path::{ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
 use crate::toc::{TocFlag, TocMask};
@@ -55,8 +56,6 @@ impl SegmentObject {
     }
 }
 
-type RawDataIndexId = Id<RawDataIndex>;
-
 #[derive(Debug)]
 struct RawDataIndex {
     pub number_of_values: u64,
@@ -64,38 +63,9 @@ struct RawDataIndex {
     pub data_size: u64,
 }
 
-struct RawDataIndexCache {
-    prev_raw_data_indexes: Vec<Option<RawDataIndexId>>,
-}
+type RawDataIndexId = Id<RawDataIndex>;
 
-impl RawDataIndexCache {
-    fn new() -> RawDataIndexCache {
-        RawDataIndexCache {
-            prev_raw_data_indexes: Vec::new(),
-        }
-    }
-
-    fn set_raw_data_index(&mut self, object: ObjectPathId, raw_data_index: RawDataIndexId) {
-        let index = object.as_usize();
-        if index >= self.prev_raw_data_indexes.len() {
-            let padding_length = index - self.prev_raw_data_indexes.len();
-            self.prev_raw_data_indexes.reserve(1 + padding_length);
-            for _ in 0..padding_length {
-                self.prev_raw_data_indexes.push(None);
-            }
-            self.prev_raw_data_indexes.push(Some(raw_data_index));
-        } else {
-            self.prev_raw_data_indexes[index] = Some(raw_data_index);
-        }
-    }
-
-    fn get_raw_data_index(&self, object: ObjectPathId) -> Option<RawDataIndexId> {
-        match self.prev_raw_data_indexes.get(object.as_usize()) {
-            Some(option) => *option,
-            _ => None,
-        }
-    }
-}
+type RawDataIndexCache = ObjectMap<RawDataIndexId>;
 
 pub struct TdmsReader {
     pub properties: HashMap<ObjectPathId, Vec<TdmsProperty>>,
@@ -220,7 +190,7 @@ impl TdmsReader {
             let segment_object = match raw_data_index_header {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
                 RAW_DATA_INDEX_MATCHES_PREVIOUS => {
-                    match self.raw_data_index_cache.get_raw_data_index(object_id) {
+                    match self.raw_data_index_cache.get(object_id) {
                         Some(raw_data_index_id) => {
                             SegmentObject::with_data(object_id, raw_data_index_id)
                         }
@@ -236,8 +206,7 @@ impl TdmsReader {
                 _ => {
                     // Raw data index header gives length of index information
                     let raw_data_index = self.data_indexes.alloc(read_raw_data_index(reader)?);
-                    self.raw_data_index_cache
-                        .set_raw_data_index(object_id, raw_data_index);
+                    self.raw_data_index_cache.set(object_id, raw_data_index);
                     SegmentObject::with_data(object_id, raw_data_index)
                 }
             };
