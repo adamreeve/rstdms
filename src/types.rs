@@ -62,6 +62,33 @@ impl TdsType {
             TdsType::DaqmxRawData => None,
         }
     }
+
+    pub fn native_type(&self) -> Option<NativeType> {
+        match *self {
+            TdsType::Void => None,
+            TdsType::I8 => Some(NativeType::I8),
+            TdsType::I16 => Some(NativeType::I16),
+            TdsType::I32 => Some(NativeType::I32),
+            TdsType::I64 => Some(NativeType::I64),
+            TdsType::U8 => Some(NativeType::U8),
+            TdsType::U16 => Some(NativeType::U16),
+            TdsType::U32 => Some(NativeType::U32),
+            TdsType::U64 => Some(NativeType::U64),
+            TdsType::SingleFloat => Some(NativeType::F32),
+            TdsType::DoubleFloat => Some(NativeType::F64),
+            TdsType::ExtendedFloat => None,
+            TdsType::SingleFloatWithUnit => Some(NativeType::F32),
+            TdsType::DoubleFloatWithUnit => Some(NativeType::F64),
+            TdsType::ExtendedFloatWithUnit => None,
+            TdsType::String => None,
+            TdsType::Boolean => None,
+            TdsType::TimeStamp => None,
+            TdsType::FixedPoint => None,
+            TdsType::ComplexSingleFloat => None,
+            TdsType::ComplexDoubleFloat => None,
+            TdsType::DaqmxRawData => None,
+        }
+    }
 }
 
 pub trait TypeReader {
@@ -158,6 +185,101 @@ impl<'a, T: Read> TypeReader for LittleEndianReader<'a, T> {
         self.reader.read_exact(&mut string_bytes)?;
         Ok(String::from_utf8(string_bytes)?)
     }
+}
+
+/// Represents a native rust type that TDMS channel data can be read as.
+pub enum NativeType {
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+    F32,
+    F64,
+}
+
+/// A native rust type that TDMS channel data can be read as.
+/// This is a sealed trait that cannot be implemented outside this crate.
+pub trait IsNativeType: private::SealedNativeType {
+    fn native_type() -> NativeType;
+}
+
+impl IsNativeType for i8 {
+    fn native_type() -> NativeType {
+        NativeType::I8
+    }
+}
+
+impl IsNativeType for i16 {
+    fn native_type() -> NativeType {
+        NativeType::I16
+    }
+}
+
+impl IsNativeType for i32 {
+    fn native_type() -> NativeType {
+        NativeType::I32
+    }
+}
+
+impl IsNativeType for i64 {
+    fn native_type() -> NativeType {
+        NativeType::I64
+    }
+}
+
+impl IsNativeType for u8 {
+    fn native_type() -> NativeType {
+        NativeType::U8
+    }
+}
+
+impl IsNativeType for u16 {
+    fn native_type() -> NativeType {
+        NativeType::U16
+    }
+}
+
+impl IsNativeType for u32 {
+    fn native_type() -> NativeType {
+        NativeType::U32
+    }
+}
+
+impl IsNativeType for u64 {
+    fn native_type() -> NativeType {
+        NativeType::U64
+    }
+}
+
+impl IsNativeType for f32 {
+    fn native_type() -> NativeType {
+        NativeType::F32
+    }
+}
+
+impl IsNativeType for f64 {
+    fn native_type() -> NativeType {
+        NativeType::F64
+    }
+}
+
+mod private {
+    pub trait SealedNativeType {}
+
+    impl SealedNativeType for i8 {}
+    impl SealedNativeType for i16 {}
+    impl SealedNativeType for i32 {}
+    impl SealedNativeType for i64 {}
+    impl SealedNativeType for u8 {}
+    impl SealedNativeType for u16 {}
+    impl SealedNativeType for u32 {}
+    impl SealedNativeType for u64 {}
+    impl SealedNativeType for f32 {}
+    impl SealedNativeType for f64 {}
 }
 
 #[cfg(test)]
