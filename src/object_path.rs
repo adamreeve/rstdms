@@ -1,6 +1,18 @@
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
+pub fn path_from_group(group_name: &str) -> String {
+    format!("/'{}'", group_name.replace("'", "''"))
+}
+
+pub fn path_from_channel(group_name: &str, channel_name: &str) -> String {
+    format!(
+        "/'{}'/'{}'",
+        group_name.replace("'", "'"),
+        channel_name.replace("'", "''")
+    )
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ObjectPathId(u32);
 

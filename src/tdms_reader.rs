@@ -75,20 +75,20 @@ type RawDataIndexId = Id<RawDataIndex>;
 
 type RawDataIndexCache = ObjectMap<RawDataIndexId>;
 
-struct ChannelDataIndex {
+pub struct ChannelDataIndex {
     pub number_of_values: u64,
     pub data_type: TdsType,
 }
 
 impl ChannelDataIndex {
-    pub fn from_segment_index(index: &RawDataIndex) -> ChannelDataIndex {
+    fn from_segment_index(index: &RawDataIndex) -> ChannelDataIndex {
         ChannelDataIndex {
             data_type: index.data_type,
             number_of_values: index.number_of_values,
         }
     }
 
-    pub fn update_with_segment_index(&mut self, index: &RawDataIndex) -> Result<()> {
+    fn update_with_segment_index(&mut self, index: &RawDataIndex) -> Result<()> {
         // We have data in this segment for an object that already had data in a
         // previous segment, check the raw data index is compatible.
         if index.data_type != self.data_type {
@@ -123,6 +123,14 @@ impl TdmsReader {
             segments: Vec::new(),
             channel_data_index_map: ChannelDataIndexMap::new(),
         }
+    }
+
+    pub fn get_object_id(&self, path: &str) -> Option<ObjectPathId> {
+        self.object_paths.get_id(path)
+    }
+
+    pub fn get_channel_data_index(&self, object_id: ObjectPathId) -> Option<&ChannelDataIndex> {
+        self.channel_data_index_map.get(object_id)
     }
 
     fn read_segments<T: Read + Seek>(&mut self, reader: &mut T) -> Result<()> {

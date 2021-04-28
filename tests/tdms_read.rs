@@ -89,6 +89,12 @@ fn read_metadata() {
         tdms_file.is_ok(),
         format!("Got error: {:?}", tdms_file.unwrap_err())
     );
+
+    let mut tdms_file = tdms_file.unwrap();
+    let mut group = tdms_file.group("Group").unwrap();
+    let mut channel = group.channel("Channel1").unwrap();
+    let mut data: Vec<i32> = Vec::new();
+    channel.read_data(&mut data).unwrap();
 }
 
 #[test]

@@ -188,6 +188,7 @@ impl<'a, T: Read> TypeReader for LittleEndianReader<'a, T> {
 }
 
 /// Represents a native rust type that TDMS channel data can be read as.
+#[derive(Debug, PartialEq)]
 pub enum NativeType {
     I8,
     I16,
