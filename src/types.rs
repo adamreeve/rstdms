@@ -3,7 +3,7 @@ use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
 use std::io::Read;
 
-#[derive(TryFromPrimitive, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, TryFromPrimitive, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum TdsType {
     Void = 0,

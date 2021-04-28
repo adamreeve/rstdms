@@ -1,11 +1,11 @@
 use crate::object_path::ObjectPathId;
 
 /// A map from object path id to values of type T, using a vector
-pub struct ObjectMap<T: Copy> {
+pub struct ObjectMap<T> {
     values: Vec<Option<T>>,
 }
 
-impl<T: Copy> ObjectMap<T> {
+impl<T> ObjectMap<T> {
     pub fn new() -> ObjectMap<T> {
         ObjectMap { values: Vec::new() }
     }
@@ -25,10 +25,18 @@ impl<T: Copy> ObjectMap<T> {
         }
     }
 
-    /// Get the value associated with an object if set
-    pub fn get(&self, object: ObjectPathId) -> Option<T> {
+    /// Get a reference to the value associated with an object if set
+    pub fn get(&self, object: ObjectPathId) -> Option<&T> {
         match self.values.get(object.as_usize()) {
-            Some(option) => *option,
+            Some(option) => option.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Get a mutable reference to the value associated with an object if set
+    pub fn get_mut(&mut self, object: ObjectPathId) -> Option<&mut T> {
+        match self.values.get_mut(object.as_usize()) {
+            Some(option) => option.as_mut(),
             _ => None,
         }
     }
@@ -58,10 +66,10 @@ mod test {
         object_map.set(root_obj, 0);
         object_map.set(channel_2, 3);
 
-        assert_eq!(object_map.get(root_obj), Some(0));
-        assert_eq!(object_map.get(group_obj), Some(1));
+        assert_eq!(object_map.get(root_obj), Some(&0));
+        assert_eq!(object_map.get(group_obj), Some(&1));
         assert_eq!(object_map.get(channel_1), None);
-        assert_eq!(object_map.get(channel_2), Some(3));
+        assert_eq!(object_map.get(channel_2), Some(&3));
         assert_eq!(object_map.get(channel_3), None);
     }
 
@@ -74,7 +82,7 @@ mod test {
         object_map.set(channel_1, 2);
         object_map.set(channel_1, 3);
 
-        assert_eq!(object_map.get(channel_1), Some(3));
+        assert_eq!(object_map.get(channel_1), Some(&3));
     }
 
     #[test]

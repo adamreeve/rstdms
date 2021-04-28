@@ -75,12 +75,42 @@ type RawDataIndexId = Id<RawDataIndex>;
 
 type RawDataIndexCache = ObjectMap<RawDataIndexId>;
 
+struct ChannelDataIndex {
+    pub number_of_values: u64,
+    pub data_type: TdsType,
+}
+
+impl ChannelDataIndex {
+    pub fn from_segment_index(index: &RawDataIndex) -> ChannelDataIndex {
+        ChannelDataIndex {
+            data_type: index.data_type,
+            number_of_values: index.number_of_values,
+        }
+    }
+
+    pub fn update_with_segment_index(&mut self, index: &RawDataIndex) -> Result<()> {
+        // We have data in this segment for an object that already had data in a
+        // previous segment, check the raw data index is compatible.
+        if index.data_type != self.data_type {
+            return Err(TdmsReadError::TdmsError(format!(
+                "Data type {:?} does not match existing data type {:?}",
+                index.data_type, self.data_type
+            )));
+        }
+        self.number_of_values += index.number_of_values;
+        Ok(())
+    }
+}
+
+type ChannelDataIndexMap = ObjectMap<ChannelDataIndex>;
+
 pub struct TdmsReader {
     pub properties: HashMap<ObjectPathId, Vec<TdmsProperty>>,
     object_paths: ObjectPathCache,
     data_indexes: Arena<RawDataIndex>,
     raw_data_index_cache: RawDataIndexCache,
     segments: Vec<TdmsSegment>,
+    channel_data_index_map: ChannelDataIndexMap,
 }
 
 impl TdmsReader {
@@ -91,6 +121,7 @@ impl TdmsReader {
             data_indexes: Arena::<RawDataIndex>::new(),
             raw_data_index_cache: RawDataIndexCache::new(),
             segments: Vec::new(),
+            channel_data_index_map: ChannelDataIndexMap::new(),
         }
     }
 
@@ -173,6 +204,8 @@ impl TdmsReader {
             }
         };
 
+        self.update_data_indexes(&segment_objects)?;
+
         Ok(Some(TdmsSegment::new(
             raw_data_position,
             next_segment_position,
@@ -194,7 +227,7 @@ impl TdmsReader {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
                 RAW_DATA_INDEX_MATCHES_PREVIOUS => match self.raw_data_index_cache.get(object_id) {
                     Some(raw_data_index_id) => {
-                        SegmentObject::with_data(object_id, raw_data_index_id)
+                        SegmentObject::with_data(object_id, *raw_data_index_id)
                     }
                     None => {
                         return Err(TdmsReadError::TdmsError(format!(
@@ -223,6 +256,31 @@ impl TdmsReader {
         }
 
         Ok(segment_objects)
+    }
+
+    /// Update the channel data indexes with data indexes for the current objects in a segment
+    fn update_data_indexes(&mut self, segment_objects: &Vec<SegmentObject>) -> Result<()> {
+        for segment_obj in segment_objects {
+            if let Some(segment_data_index_id) = segment_obj.raw_data_index {
+                // If we have a valid raw data index id it must correspond to a raw data index
+                // in data_indexes so unwrap here is safe.
+                let segment_raw_data_index = self.data_indexes.get(segment_data_index_id).unwrap();
+                let existing_data_index =
+                    self.channel_data_index_map.get_mut(segment_obj.object_id);
+                match existing_data_index {
+                    Some(existing_data_index) => {
+                        existing_data_index.update_with_segment_index(segment_raw_data_index)?;
+                    }
+                    None => {
+                        let new_data_index =
+                            ChannelDataIndex::from_segment_index(segment_raw_data_index);
+                        self.channel_data_index_map
+                            .set(segment_obj.object_id, new_data_index);
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -255,7 +313,7 @@ impl ObjectMerger {
             for obj in new_objects {
                 match self.object_indexes.get(obj.object_id) {
                     Some(i) => {
-                        merged_objects[i] = obj;
+                        merged_objects[*i] = obj;
                     }
                     None => {
                         merged_objects.push(obj);
