@@ -63,22 +63,22 @@ impl TdsType {
         }
     }
 
-    pub fn native_type(&self) -> Option<NativeType> {
+    pub fn native_type(&self) -> Option<NativeTypeId> {
         match *self {
             TdsType::Void => None,
-            TdsType::I8 => Some(NativeType::I8),
-            TdsType::I16 => Some(NativeType::I16),
-            TdsType::I32 => Some(NativeType::I32),
-            TdsType::I64 => Some(NativeType::I64),
-            TdsType::U8 => Some(NativeType::U8),
-            TdsType::U16 => Some(NativeType::U16),
-            TdsType::U32 => Some(NativeType::U32),
-            TdsType::U64 => Some(NativeType::U64),
-            TdsType::SingleFloat => Some(NativeType::F32),
-            TdsType::DoubleFloat => Some(NativeType::F64),
+            TdsType::I8 => Some(NativeTypeId::I8),
+            TdsType::I16 => Some(NativeTypeId::I16),
+            TdsType::I32 => Some(NativeTypeId::I32),
+            TdsType::I64 => Some(NativeTypeId::I64),
+            TdsType::U8 => Some(NativeTypeId::U8),
+            TdsType::U16 => Some(NativeTypeId::U16),
+            TdsType::U32 => Some(NativeTypeId::U32),
+            TdsType::U64 => Some(NativeTypeId::U64),
+            TdsType::SingleFloat => Some(NativeTypeId::F32),
+            TdsType::DoubleFloat => Some(NativeTypeId::F64),
             TdsType::ExtendedFloat => None,
-            TdsType::SingleFloatWithUnit => Some(NativeType::F32),
-            TdsType::DoubleFloatWithUnit => Some(NativeType::F64),
+            TdsType::SingleFloatWithUnit => Some(NativeTypeId::F32),
+            TdsType::DoubleFloatWithUnit => Some(NativeTypeId::F64),
             TdsType::ExtendedFloatWithUnit => None,
             TdsType::String => None,
             TdsType::Boolean => None,
@@ -189,7 +189,7 @@ impl<'a, T: Read> TypeReader for LittleEndianReader<'a, T> {
 
 /// Represents a native rust type that TDMS channel data can be read as.
 #[derive(Debug, PartialEq)]
-pub enum NativeType {
+pub enum NativeTypeId {
     I8,
     I16,
     I32,
@@ -204,67 +204,67 @@ pub enum NativeType {
 
 /// A native rust type that TDMS channel data can be read as.
 /// This is a sealed trait that cannot be implemented outside this crate.
-pub trait IsNativeType: private::SealedNativeType {
-    fn native_type() -> NativeType;
+pub trait NativeType: private::SealedNativeType {
+    fn native_type() -> NativeTypeId;
 }
 
-impl IsNativeType for i8 {
-    fn native_type() -> NativeType {
-        NativeType::I8
+impl NativeType for i8 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::I8
     }
 }
 
-impl IsNativeType for i16 {
-    fn native_type() -> NativeType {
-        NativeType::I16
+impl NativeType for i16 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::I16
     }
 }
 
-impl IsNativeType for i32 {
-    fn native_type() -> NativeType {
-        NativeType::I32
+impl NativeType for i32 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::I32
     }
 }
 
-impl IsNativeType for i64 {
-    fn native_type() -> NativeType {
-        NativeType::I64
+impl NativeType for i64 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::I64
     }
 }
 
-impl IsNativeType for u8 {
-    fn native_type() -> NativeType {
-        NativeType::U8
+impl NativeType for u8 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::U8
     }
 }
 
-impl IsNativeType for u16 {
-    fn native_type() -> NativeType {
-        NativeType::U16
+impl NativeType for u16 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::U16
     }
 }
 
-impl IsNativeType for u32 {
-    fn native_type() -> NativeType {
-        NativeType::U32
+impl NativeType for u32 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::U32
     }
 }
 
-impl IsNativeType for u64 {
-    fn native_type() -> NativeType {
-        NativeType::U64
+impl NativeType for u64 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::U64
     }
 }
 
-impl IsNativeType for f32 {
-    fn native_type() -> NativeType {
-        NativeType::F32
+impl NativeType for f32 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::F32
     }
 }
 
-impl IsNativeType for f64 {
-    fn native_type() -> NativeType {
-        NativeType::F64
+impl NativeType for f64 {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::F64
     }
 }
 

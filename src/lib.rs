@@ -12,7 +12,7 @@ mod types;
 use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPathId};
 use crate::tdms_reader::{read_metadata, TdmsReader};
-use crate::types::IsNativeType;
+use crate::types::NativeType;
 use std::io::{BufReader, Read, Seek};
 
 pub struct TdmsFile<T: Read + Seek> {
@@ -93,7 +93,7 @@ impl<'a, T: Read + Seek> Channel<'a, T> {
     }
 
     /// Read all data for this channel into the given buffer.
-    pub fn read_data<B: IsNativeType>(&'a mut self, buffer: &mut Vec<B>) -> Result<()> {
+    pub fn read_data<B: NativeType>(&'a mut self, buffer: &mut Vec<B>) -> Result<()> {
         match self.file.metadata.get_channel_data_index(self.object_id) {
             Some(channel_data_index) => {
                 let tdms_type = channel_data_index.data_type;
