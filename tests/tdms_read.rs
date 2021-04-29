@@ -95,6 +95,8 @@ fn read_metadata() {
     let mut channel = group.channel("Channel1").unwrap();
     let mut data: Vec<i32> = Vec::new();
     channel.read_data(&mut data).unwrap();
+
+    assert_eq!(data, vec![1, 2, 3]);
 }
 
 #[test]
@@ -153,4 +155,12 @@ fn read_metadata_with_repeated_raw_data_index() {
         tdms_file.is_ok(),
         format!("Got error: {:?}", tdms_file.unwrap_err())
     );
+
+    let mut tdms_file = tdms_file.unwrap();
+    let mut group = tdms_file.group("Group").unwrap();
+    let mut channel = group.channel("Channel1").unwrap();
+    let mut data: Vec<i32> = Vec::new();
+    channel.read_data(&mut data).unwrap();
+
+    assert_eq!(data, vec![1, 2, 3, 1, 2, 3]);
 }

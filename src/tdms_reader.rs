@@ -3,7 +3,7 @@ use crate::object_map::ObjectMap;
 use crate::object_path::{ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
 use crate::toc::{TocFlag, TocMask};
-use crate::types::{LittleEndianReader, TdsType, TypeReader};
+use crate::types::{LittleEndianReader, NativeType, TdsType, TypeReader};
 use id_arena::{Arena, Id};
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
@@ -39,6 +39,31 @@ impl TdmsSegment {
             next_segment_position,
             objects,
         }
+    }
+
+    fn read_channel_data<T: Read + Seek, B: NativeType>(
+        &self,
+        reader: &mut T,
+        channel_id: ObjectPathId,
+        buffer: &mut Vec<B>,
+        raw_data_indexes: &Arena<RawDataIndex>,
+    ) -> Result<()> {
+        let mut channel_offset = 0;
+        for obj in self.objects.iter() {
+            if let Some(raw_data_index_id) = obj.raw_data_index {
+                let raw_data_index = raw_data_indexes.get(raw_data_index_id).unwrap();
+                if obj.object_id == channel_id {
+                    reader.seek(SeekFrom::Start(self.data_position + channel_offset))?;
+                    let mut bytes = vec![0u8; raw_data_index.data_size as usize];
+                    reader.read_exact(&mut bytes)?;
+                    B::from_bytes(buffer, &bytes)?;
+                    break;
+                } else {
+                    channel_offset += raw_data_index.data_size;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -131,6 +156,24 @@ impl TdmsReader {
 
     pub fn get_channel_data_index(&self, object_id: ObjectPathId) -> Option<&ChannelDataIndex> {
         self.channel_data_index_map.get(object_id)
+    }
+
+    pub fn read_channel_data<T: Read + Seek, B: NativeType>(
+        &self,
+        reader: &mut T,
+        channel_id: ObjectPathId,
+        buffer: &mut Vec<B>,
+    ) -> Result<()> {
+        for segment in self.segments.iter() {
+            if segment
+                .objects
+                .iter()
+                .any(|o| o.object_id == channel_id && o.raw_data_index.is_some())
+            {
+                segment.read_channel_data(reader, channel_id, buffer, &self.data_indexes)?;
+            }
+        }
+        Ok(())
     }
 
     fn read_segments<T: Read + Seek>(&mut self, reader: &mut T) -> Result<()> {

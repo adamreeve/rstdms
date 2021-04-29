@@ -204,13 +204,18 @@ pub enum NativeTypeId {
 
 /// A native rust type that TDMS channel data can be read as.
 /// This is a sealed trait that cannot be implemented outside this crate.
-pub trait NativeType: private::SealedNativeType {
+pub trait NativeType: private::SealedNativeType + Sized {
     fn native_type() -> NativeTypeId;
+    fn from_bytes(target_buffer: &mut Vec<Self>, source_bytes: &[u8]) -> Result<()>;
 }
 
 impl NativeType for i8 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::I8
+    }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
     }
 }
 
@@ -218,11 +223,24 @@ impl NativeType for i16 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::I16
     }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 impl NativeType for i32 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::I32
+    }
+
+    fn from_bytes(target_buffer: &mut Vec<Self>, source_bytes: &[u8]) -> Result<()> {
+        for i in (0..source_bytes.len()).step_by(4) {
+            let mut value = [0u8; 4];
+            value.copy_from_slice(&source_bytes[i..i + 4]);
+            target_buffer.push(i32::from_le_bytes(value));
+        }
+        Ok(())
     }
 }
 
@@ -230,11 +248,19 @@ impl NativeType for i64 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::I64
     }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 impl NativeType for u8 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::U8
+    }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
     }
 }
 
@@ -242,11 +268,19 @@ impl NativeType for u16 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::U16
     }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 impl NativeType for u32 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::U32
+    }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
     }
 }
 
@@ -254,17 +288,29 @@ impl NativeType for u64 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::U64
     }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 impl NativeType for f32 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::F32
     }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
+    }
 }
 
 impl NativeType for f64 {
     fn native_type() -> NativeTypeId {
         NativeTypeId::F64
+    }
+
+    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+        unimplemented!();
     }
 }
 

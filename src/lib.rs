@@ -16,7 +16,7 @@ use crate::types::NativeType;
 use std::io::{BufReader, Read, Seek};
 
 pub struct TdmsFile<T: Read + Seek> {
-    _reader: BufReader<T>,
+    reader: BufReader<T>,
     metadata: TdmsReader,
 }
 
@@ -36,10 +36,7 @@ impl<T: Read + Seek> TdmsFile<T> {
     pub fn new(reader: T) -> Result<TdmsFile<T>> {
         let mut reader = BufReader::new(reader);
         let metadata = read_metadata(&mut reader)?;
-        Ok(TdmsFile {
-            _reader: reader,
-            metadata,
-        })
+        Ok(TdmsFile { reader, metadata })
     }
 
     /// Get a group within the TDMS file
@@ -111,7 +108,12 @@ impl<'a, T: Read + Seek> Channel<'a, T> {
                 } else {
                     // Buffer type matches expected native type, safe to read data
                     buffer.reserve(channel_data_index.number_of_values as usize);
-                    unimplemented!();
+                    self.file.metadata.read_channel_data(
+                        &mut self.file.reader,
+                        self.object_id,
+                        buffer,
+                    )?;
+                    Ok(())
                 }
             }
             None => Ok(()),
