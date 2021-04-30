@@ -105,17 +105,17 @@ pub trait TypeReader {
     fn read_string(&mut self) -> Result<String>;
 }
 
-pub struct LittleEndianReader<'a, T: Read> {
-    reader: &'a mut T,
+pub struct LittleEndianReader<'a, R: Read> {
+    reader: &'a mut R,
 }
 
-impl<'a, T: Read> LittleEndianReader<'a, T> {
-    pub fn new(reader: &'a mut T) -> LittleEndianReader<'a, T> {
+impl<'a, R: Read> LittleEndianReader<'a, R> {
+    pub fn new(reader: &'a mut R) -> LittleEndianReader<'a, R> {
         LittleEndianReader { reader }
     }
 }
 
-impl<'a, T: Read> TypeReader for LittleEndianReader<'a, T> {
+impl<'a, R: Read> TypeReader for LittleEndianReader<'a, R> {
     fn read_int8(&mut self) -> Result<i8> {
         let mut buffer = [0; 1];
         self.reader.read_exact(&mut buffer)?;

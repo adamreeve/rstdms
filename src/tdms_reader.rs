@@ -13,7 +13,7 @@ const RAW_DATA_INDEX_MATCHES_PREVIOUS: u32 = 0x00000000;
 const FORMAT_CHANGING_SCALER: u32 = 0x00001269;
 const DIGITAL_LINE_SCALER: u32 = 0x0000126A;
 
-pub fn read_metadata<T: Read + Seek>(reader: &mut T) -> Result<TdmsReader> {
+pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<TdmsReader> {
     let mut tdms_reader = TdmsReader::new();
     match tdms_reader.read_segments(reader) {
         Ok(()) => Ok(tdms_reader),
@@ -41,11 +41,11 @@ impl TdmsSegment {
         }
     }
 
-    fn read_channel_data<T: Read + Seek, B: NativeType>(
+    fn read_channel_data<R: Read + Seek, T: NativeType>(
         &self,
-        reader: &mut T,
+        reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<B>,
+        buffer: &mut Vec<T>,
         raw_data_indexes: &Arena<RawDataIndex>,
     ) -> Result<()> {
         let mut channel_offset = 0;
@@ -56,7 +56,7 @@ impl TdmsSegment {
                     reader.seek(SeekFrom::Start(self.data_position + channel_offset))?;
                     let mut bytes = vec![0u8; raw_data_index.data_size as usize];
                     reader.read_exact(&mut bytes)?;
-                    B::from_bytes(buffer, &bytes)?;
+                    T::from_bytes(buffer, &bytes)?;
                     break;
                 } else {
                     channel_offset += raw_data_index.data_size;
@@ -158,11 +158,11 @@ impl TdmsReader {
         self.channel_data_index_map.get(object_id)
     }
 
-    pub fn read_channel_data<T: Read + Seek, B: NativeType>(
+    pub fn read_channel_data<R: Read + Seek, T: NativeType>(
         &self,
-        reader: &mut T,
+        reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<B>,
+        buffer: &mut Vec<T>,
     ) -> Result<()> {
         for segment in self.segments.iter() {
             if segment
@@ -176,7 +176,7 @@ impl TdmsReader {
         Ok(())
     }
 
-    fn read_segments<T: Read + Seek>(&mut self, reader: &mut T) -> Result<()> {
+    fn read_segments<R: Read + Seek>(&mut self, reader: &mut R) -> Result<()> {
         let mut object_merger = ObjectMerger::new();
         loop {
             let position = reader.seek(SeekFrom::Current(0))?;
@@ -196,9 +196,9 @@ impl TdmsReader {
         Ok(())
     }
 
-    fn read_segment<T: Read + Seek>(
+    fn read_segment<R: Read + Seek>(
         &mut self,
-        reader: &mut T,
+        reader: &mut R,
         position: u64,
         object_merger: &mut ObjectMerger,
     ) -> Result<Option<TdmsSegment>> {
@@ -264,9 +264,9 @@ impl TdmsReader {
         )))
     }
 
-    fn read_object_metadata<T: TypeReader>(
+    fn read_object_metadata<R: TypeReader>(
         &mut self,
-        reader: &mut T,
+        reader: &mut R,
     ) -> Result<Vec<SegmentObject>> {
         let num_objects = reader.read_uint32()?;
         let mut segment_objects = Vec::with_capacity(num_objects as usize);
@@ -378,7 +378,7 @@ impl ObjectMerger {
     }
 }
 
-fn read_raw_data_index<T: TypeReader>(reader: &mut T) -> Result<RawDataIndex> {
+fn read_raw_data_index<R: TypeReader>(reader: &mut R) -> Result<RawDataIndex> {
     let data_type = reader.read_uint32()?;
     let data_type = TdsType::from_u32(data_type)?;
     let dimension = reader.read_uint32()?;
