@@ -5,6 +5,7 @@ authors = ["Adam Reeve <adreeve@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+byteorder = "1.4.3"
 num_enum = "0.5.1"
 id-arena = "2.2.1"
 

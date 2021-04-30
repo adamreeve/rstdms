@@ -1,4 +1,5 @@
 use crate::error::{Result, TdmsReadError};
+use byteorder::{LittleEndian, ReadBytesExt};
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
 use std::io::Read;
@@ -209,7 +210,11 @@ pub trait NativeType: private::SealedNativeType + Sized {
     fn native_type() -> NativeTypeId;
 
     #[doc(hidden)]
-    fn from_bytes(target_buffer: &mut Vec<Self>, source_bytes: &[u8]) -> Result<()>;
+    fn read_values<R: Read>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
+    ) -> Result<()>;
 }
 
 impl NativeType for i8 {
@@ -217,7 +222,11 @@ impl NativeType for i8 {
         NativeTypeId::I8
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -227,7 +236,11 @@ impl NativeType for i16 {
         NativeTypeId::I16
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -237,12 +250,15 @@ impl NativeType for i32 {
         NativeTypeId::I32
     }
 
-    fn from_bytes(target_buffer: &mut Vec<Self>, source_bytes: &[u8]) -> Result<()> {
-        for i in (0..source_bytes.len()).step_by(4) {
-            let mut value = [0u8; 4];
-            value.copy_from_slice(&source_bytes[i..i + 4]);
-            target_buffer.push(i32::from_le_bytes(value));
-        }
+    fn read_values<R: Read>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
+    ) -> Result<()> {
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_i32_into::<LittleEndian>(&mut target_buffer[original_length..new_length])?;
         Ok(())
     }
 }
@@ -252,7 +268,11 @@ impl NativeType for i64 {
         NativeTypeId::I64
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -262,7 +282,11 @@ impl NativeType for u8 {
         NativeTypeId::U8
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -272,7 +296,11 @@ impl NativeType for u16 {
         NativeTypeId::U16
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -282,7 +310,11 @@ impl NativeType for u32 {
         NativeTypeId::U32
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -292,7 +324,11 @@ impl NativeType for u64 {
         NativeTypeId::U64
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -302,7 +338,11 @@ impl NativeType for f32 {
         NativeTypeId::F32
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }
@@ -312,7 +352,11 @@ impl NativeType for f64 {
         NativeTypeId::F64
     }
 
-    fn from_bytes(_target_buffer: &mut Vec<Self>, _source_bytes: &[u8]) -> Result<()> {
+    fn read_values<R: Read>(
+        _target_buffer: &mut Vec<Self>,
+        _reader: &mut R,
+        _num_values: usize,
+    ) -> Result<()> {
         unimplemented!();
     }
 }

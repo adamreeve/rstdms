@@ -1,3 +1,4 @@
+extern crate byteorder;
 extern crate id_arena;
 extern crate num_enum;
 
@@ -12,7 +13,7 @@ mod types;
 use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPathId};
 use crate::tdms_reader::{read_metadata, TdmsReader};
-use crate::types::NativeType;
+pub use crate::types::NativeType;
 use std::io::{BufReader, Read, Seek};
 
 pub struct TdmsFile<R: Read + Seek> {

@@ -54,9 +54,7 @@ impl TdmsSegment {
                 let raw_data_index = raw_data_indexes.get(raw_data_index_id).unwrap();
                 if obj.object_id == channel_id {
                     reader.seek(SeekFrom::Start(self.data_position + channel_offset))?;
-                    let mut bytes = vec![0u8; raw_data_index.data_size as usize];
-                    reader.read_exact(&mut bytes)?;
-                    T::from_bytes(buffer, &bytes)?;
+                    T::read_values(buffer, reader, raw_data_index.number_of_values as usize)?;
                     break;
                 } else {
                     channel_offset += raw_data_index.data_size;
