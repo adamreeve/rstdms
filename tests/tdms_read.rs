@@ -41,6 +41,49 @@ impl TestFile {
     }
 }
 
+fn object_metadata(
+    path: &'static str,
+    raw_data_index: &[u8],
+    properties: Vec<(&'static str, u32, &[u8])>,
+) -> Vec<u8> {
+    let mut metadata_bytes = Vec::new();
+    write_string(path, &mut metadata_bytes);
+    metadata_bytes.extend(raw_data_index);
+    metadata_bytes.extend(&((properties.len() as u32).to_le_bytes()));
+    for (name, type_id, val) in properties {
+        write_string(name, &mut metadata_bytes);
+        metadata_bytes.extend(&(type_id.to_le_bytes()));
+        metadata_bytes.extend(val);
+    }
+    metadata_bytes
+}
+
+fn raw_data_index(data_type: u32, number_of_values: u64) -> Vec<u8> {
+    let mut index_bytes = Vec::new();
+    index_bytes.extend(&(20_u32.to_le_bytes())); // Raw data index length
+    index_bytes.extend(&(data_type.to_le_bytes())); // Data type
+    index_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
+    index_bytes.extend(&(number_of_values.to_le_bytes())); // Number of values
+    index_bytes
+}
+
+fn metadata(objects: Vec<Vec<u8>>) -> Vec<u8> {
+    let mut metadata_bytes = Vec::new();
+    metadata_bytes.extend(&((objects.len() as u32).to_le_bytes()));
+    for object in objects {
+        metadata_bytes.extend(object);
+    }
+    metadata_bytes
+}
+
+fn data_bytes_i32(data: Vec<i32>) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    for val in data {
+        bytes.extend(&(val.to_le_bytes()));
+    }
+    bytes
+}
+
 fn write_string(string: &str, bytes: &mut Vec<u8>) {
     bytes.extend(&(string.len() as u32).to_le_bytes());
     bytes.extend(string.bytes());
@@ -48,39 +91,16 @@ fn write_string(string: &str, bytes: &mut Vec<u8>) {
 
 #[test]
 fn read_metadata() {
-    let mut metadata_bytes = Vec::new();
-
-    // Number of objects
-    metadata_bytes.extend(&(2_u32.to_le_bytes()));
-
-    // Object path
-    write_string("/", &mut metadata_bytes);
-    // Raw data index
-    metadata_bytes.extend(&hex!("FF FF FF FF"));
-    // Number of properties
-    metadata_bytes.extend(&(1_u32.to_le_bytes()));
-    // Property
-    write_string("test_property", &mut metadata_bytes);
-    metadata_bytes.extend(&(3_u32.to_le_bytes()));
-    metadata_bytes.extend(&(10_i32.to_le_bytes()));
-
-    // Object path
-    write_string("/'Group'/'Channel1'", &mut metadata_bytes);
-    // Raw data index
-    metadata_bytes.extend(&(20_u32.to_le_bytes())); // Raw data index length
-    metadata_bytes.extend(&(3_u32.to_le_bytes())); // Data type
-    metadata_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
-    metadata_bytes.extend(&(3_u64.to_le_bytes())); // Number of values
-
-    // Number of properties
-    metadata_bytes.extend(&(0_u32.to_le_bytes()));
-
-    let mut data_bytes = Vec::new();
-    data_bytes.extend(&(1_i32.to_le_bytes()));
-    data_bytes.extend(&(2_i32.to_le_bytes()));
-    data_bytes.extend(&(3_i32.to_le_bytes()));
-
     let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![
+        object_metadata(
+            "/",
+            &hex!("FF FF FF FF"),
+            vec![("test_property", 3, &10_i32.to_le_bytes())],
+        ),
+        object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 3), Vec::new()),
+    ]);
+    let data_bytes = data_bytes_i32(vec![1, 2, 3]);
     test_file.add_segment(&metadata_bytes, &data_bytes);
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
@@ -101,52 +121,19 @@ fn read_metadata() {
 
 #[test]
 fn read_metadata_with_repeated_raw_data_index() {
-    let mut metadata_bytes = Vec::new();
-
-    // Number of objects
-    metadata_bytes.extend(&(2_u32.to_le_bytes()));
-
-    // Object path
-    write_string("/", &mut metadata_bytes);
-    // Raw data index
-    metadata_bytes.extend(&hex!("FF FF FF FF"));
-    // Number of properties
-    metadata_bytes.extend(&(1_u32.to_le_bytes()));
-    // Property
-    write_string("test_property", &mut metadata_bytes);
-    metadata_bytes.extend(&(3_u32.to_le_bytes()));
-    metadata_bytes.extend(&(10_i32.to_le_bytes()));
-
-    // Object path
-    write_string("/'Group'/'Channel1'", &mut metadata_bytes);
-    // Raw data index
-    metadata_bytes.extend(&(20_u32.to_le_bytes())); // Raw data index length
-    metadata_bytes.extend(&(3_u32.to_le_bytes())); // Data type
-    metadata_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
-    metadata_bytes.extend(&(3_u64.to_le_bytes())); // Number of values
-
-    // Number of properties
-    metadata_bytes.extend(&(0_u32.to_le_bytes()));
-
-    let mut data_bytes = Vec::new();
-    data_bytes.extend(&(1_i32.to_le_bytes()));
-    data_bytes.extend(&(2_i32.to_le_bytes()));
-    data_bytes.extend(&(3_i32.to_le_bytes()));
-
     let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![object_metadata(
+        "/'Group'/'Channel1'",
+        &raw_data_index(3, 3),
+        Vec::new(),
+    )]);
+    let data_bytes = data_bytes_i32(vec![1, 2, 3]);
     test_file.add_segment(&metadata_bytes, &data_bytes);
-
-    metadata_bytes.clear();
-
-    // Number of objects
-    metadata_bytes.extend(&(1_u32.to_le_bytes()));
-    // Object path
-    write_string("/'Group'/'Channel1'", &mut metadata_bytes);
-    // Raw data index matches previous
-    metadata_bytes.extend(&(0_u32.to_le_bytes()));
-    // Number of properties
-    metadata_bytes.extend(&(0_u32.to_le_bytes()));
-
+    let metadata_bytes = metadata(vec![object_metadata(
+        "/'Group'/'Channel1'",
+        &(0_u32.to_le_bytes()), // Raw data index matches previous
+        Vec::new(),
+    )]);
     test_file.add_segment(&metadata_bytes, &data_bytes);
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
@@ -163,4 +150,47 @@ fn read_metadata_with_repeated_raw_data_index() {
     channel.read_data(&mut data).unwrap();
 
     assert_eq!(data, vec![1, 2, 3, 1, 2, 3]);
+}
+
+#[test]
+fn multiple_channels() {
+    let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![
+        object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 2), Vec::new()),
+        object_metadata("/'Group'/'Channel2'", &raw_data_index(3, 3), Vec::new()),
+        object_metadata("/'Group'/'Channel3'", &raw_data_index(3, 4), Vec::new()),
+    ]);
+    let data_bytes = data_bytes_i32(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    test_file.add_segment(&metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(
+        tdms_file.is_ok(),
+        format!("Got error: {:?}", tdms_file.unwrap_err())
+    );
+
+    let mut tdms_file = tdms_file.unwrap();
+
+    {
+        let mut group = tdms_file.group("Group").unwrap();
+        let mut channel = group.channel("Channel1").unwrap();
+        let mut data: Vec<i32> = Vec::new();
+        channel.read_data(&mut data).unwrap();
+        assert_eq!(data, vec![1, 2]);
+    }
+    {
+        let mut group = tdms_file.group("Group").unwrap();
+        let mut channel = group.channel("Channel2").unwrap();
+        let mut data: Vec<i32> = Vec::new();
+        channel.read_data(&mut data).unwrap();
+        assert_eq!(data, vec![3, 4, 5]);
+    }
+    {
+        let mut group = tdms_file.group("Group").unwrap();
+        let mut channel = group.channel("Channel3").unwrap();
+        let mut data: Vec<i32> = Vec::new();
+        channel.read_data(&mut data).unwrap();
+        assert_eq!(data, vec![6, 7, 8, 9]);
+    }
 }

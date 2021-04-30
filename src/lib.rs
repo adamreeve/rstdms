@@ -96,25 +96,25 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
             Some(channel_data_index) => {
                 let tdms_type = channel_data_index.data_type;
                 let expected_native_type = tdms_type.native_type();
-                if expected_native_type.is_none() {
-                    Err(TdmsReadError::TdmsError(format!(
-                        "Reading data of type {:?} is not supported",
-                        tdms_type
-                    )))
-                } else if expected_native_type != Some(T::native_type()) {
-                    Err(TdmsReadError::TdmsError(format!(
+                match expected_native_type {
+                    Some(expected_native_type) if expected_native_type == T::native_type() => {
+                        // Buffer type matches expected native type, safe to read data
+                        buffer.reserve(channel_data_index.number_of_values as usize);
+                        self.file.metadata.read_channel_data(
+                            &mut self.file.reader,
+                            self.object_id,
+                            buffer,
+                        )?;
+                        Ok(())
+                    }
+                    Some(expected_native_type) => Err(TdmsReadError::TdmsError(format!(
                         "Expected a buffer with item type {:?}",
                         expected_native_type
-                    )))
-                } else {
-                    // Buffer type matches expected native type, safe to read data
-                    buffer.reserve(channel_data_index.number_of_values as usize);
-                    self.file.metadata.read_channel_data(
-                        &mut self.file.reader,
-                        self.object_id,
-                        buffer,
-                    )?;
-                    Ok(())
+                    ))),
+                    None => Err(TdmsReadError::TdmsError(format!(
+                        "Reading data of type {:?} is not supported",
+                        tdms_type
+                    ))),
                 }
             }
             None => Ok(()),
