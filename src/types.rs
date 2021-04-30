@@ -205,7 +205,10 @@ pub enum NativeTypeId {
 /// A native rust type that TDMS channel data can be read as.
 /// This is a sealed trait that cannot be implemented outside this crate.
 pub trait NativeType: private::SealedNativeType + Sized {
+    #[doc(hidden)]
     fn native_type() -> NativeTypeId;
+
+    #[doc(hidden)]
     fn from_bytes(target_buffer: &mut Vec<Self>, source_bytes: &[u8]) -> Result<()>;
 }
 
