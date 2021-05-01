@@ -68,7 +68,7 @@ impl<'a, R: Read + Seek> Group<'a, R> {
     }
 
     /// Get a channel within this group
-    pub fn channel(&'a mut self, channel_name: &str) -> Option<Channel<'a, R>> {
+    pub fn channel<'b>(&'b mut self, channel_name: &str) -> Option<Channel<'b, R>> {
         let channel_path = path_from_channel(self.name, channel_name);
         match self.file.metadata.get_object_id(&channel_path) {
             Some(object_id) => Some(Channel::new(self.file, object_id)),

@@ -171,26 +171,18 @@ fn multiple_channels() {
     );
 
     let mut tdms_file = tdms_file.unwrap();
+    let mut group = tdms_file.group("Group").unwrap();
 
-    {
-        let mut group = tdms_file.group("Group").unwrap();
-        let mut channel = group.channel("Channel1").unwrap();
+    let expected_data = vec![
+        vec![1, 2],
+        vec![3, 4, 5],
+        vec![6, 7, 8, 9],
+    ];
+
+    for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
+        let mut channel = group.channel(channel_name).unwrap();
         let mut data: Vec<i32> = Vec::new();
         channel.read_data(&mut data).unwrap();
-        assert_eq!(data, vec![1, 2]);
-    }
-    {
-        let mut group = tdms_file.group("Group").unwrap();
-        let mut channel = group.channel("Channel2").unwrap();
-        let mut data: Vec<i32> = Vec::new();
-        channel.read_data(&mut data).unwrap();
-        assert_eq!(data, vec![3, 4, 5]);
-    }
-    {
-        let mut group = tdms_file.group("Group").unwrap();
-        let mut channel = group.channel("Channel3").unwrap();
-        let mut data: Vec<i32> = Vec::new();
-        channel.read_data(&mut data).unwrap();
-        assert_eq!(data, vec![6, 7, 8, 9]);
+        assert_eq!(data, expected_data[i]);
     }
 }
