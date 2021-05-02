@@ -311,12 +311,12 @@ impl TdmsReader {
                 this_segment_objects
             } else {
                 // Not a new object list so merge with previous segment objects
-                let prev_objs = last_segment(&self.segments).map(|segment| &segment.objects);
+                let prev_objs = self.segments.last().map(|segment| &segment.objects);
                 object_merger.merge_objects(prev_objs, this_segment_objects)
             }
         } else {
             // No meta data in this segment, re-use metadata from the previous segment
-            match last_segment(&self.segments) {
+            match self.segments.last() {
                 // TODO: Share references to object vectors?
                 Some(segment) => segment.objects.to_vec(),
                 None => Vec::new(),
@@ -478,13 +478,4 @@ fn read_raw_data_index<R: TypeReader>(reader: &mut R) -> Result<RawDataIndex> {
         data_type,
         data_size,
     })
-}
-
-fn last_segment(segments: &Vec<TdmsSegment>) -> Option<&TdmsSegment> {
-    let segments_length = segments.len();
-    if segments_length > 0 {
-        Some(&segments[segments_length - 1])
-    } else {
-        None
-    }
 }
