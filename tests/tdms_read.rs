@@ -9,17 +9,21 @@ struct TestFile {
     bytes: Vec<u8>,
 }
 
+const TOC_METADATA: u32 = 1 << 1;
+const TOC_NEW_OBJ_LIST: u32 = 1 << 2;
+const TOC_RAW_DATA: u32 = 1 << 3;
+const TOC_INTERLEAVED_DATA: u32 = 1 << 5;
+
 impl TestFile {
     fn new() -> TestFile {
         TestFile { bytes: Vec::new() }
     }
 
-    fn add_segment(&mut self, metadata_bytes: &Vec<u8>, data_bytes: &Vec<u8>) {
+    fn add_segment(&mut self, toc_mask: u32, metadata_bytes: &Vec<u8>, data_bytes: &Vec<u8>) {
         // TDSm tag
         self.bytes.extend(&hex!("54 44 53 6D"));
 
         // ToC mask
-        let toc_mask: u32 = (1 << 1) | (1 << 2) | (1 << 3);
         self.bytes.extend(&toc_mask.to_le_bytes());
 
         // Version number
@@ -101,7 +105,8 @@ fn read_metadata() {
         object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 3), Vec::new()),
     ]);
     let data_bytes = data_bytes_i32(vec![1, 2, 3]);
-    test_file.add_segment(&metadata_bytes, &data_bytes);
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
@@ -128,13 +133,14 @@ fn read_metadata_with_repeated_raw_data_index() {
         Vec::new(),
     )]);
     let data_bytes = data_bytes_i32(vec![1, 2, 3]);
-    test_file.add_segment(&metadata_bytes, &data_bytes);
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
     let metadata_bytes = metadata(vec![object_metadata(
         "/'Group'/'Channel1'",
         &(0_u32.to_le_bytes()), // Raw data index matches previous
         Vec::new(),
     )]);
-    test_file.add_segment(&metadata_bytes, &data_bytes);
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
@@ -161,7 +167,8 @@ fn multiple_channels() {
         object_metadata("/'Group'/'Channel3'", &raw_data_index(3, 4), Vec::new()),
     ]);
     let data_bytes = data_bytes_i32(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    test_file.add_segment(&metadata_bytes, &data_bytes);
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
@@ -173,11 +180,40 @@ fn multiple_channels() {
     let mut tdms_file = tdms_file.unwrap();
     let mut group = tdms_file.group("Group").unwrap();
 
-    let expected_data = vec![
-        vec![1, 2],
-        vec![3, 4, 5],
-        vec![6, 7, 8, 9],
-    ];
+    let expected_data = vec![vec![1, 2], vec![3, 4, 5], vec![6, 7, 8, 9]];
+
+    for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
+        let mut channel = group.channel(channel_name).unwrap();
+        let mut data: Vec<i32> = Vec::new();
+        channel.read_data(&mut data).unwrap();
+        assert_eq!(data, expected_data[i]);
+    }
+}
+
+#[test]
+fn interleaved_data() {
+    let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![
+        object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 4), Vec::new()),
+        object_metadata("/'Group'/'Channel2'", &raw_data_index(3, 4), Vec::new()),
+        object_metadata("/'Group'/'Channel3'", &raw_data_index(3, 4), Vec::new()),
+    ]);
+    let data_bytes = data_bytes_i32(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA | TOC_INTERLEAVED_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(
+        tdms_file.is_ok(),
+        format!("Got error: {:?}", tdms_file.unwrap_err())
+    );
+
+    let mut tdms_file = tdms_file.unwrap();
+    let mut group = tdms_file.group("Group").unwrap();
+
+    let expected_data = vec![vec![1, 4, 7, 10], vec![2, 5, 8, 11], vec![3, 6, 9, 12]];
 
     for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
         let mut channel = group.channel(channel_name).unwrap();
