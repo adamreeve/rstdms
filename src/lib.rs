@@ -7,6 +7,7 @@ mod interleaved;
 mod object_map;
 mod object_path;
 mod properties;
+mod segment;
 mod tdms_reader;
 mod toc;
 mod types;
