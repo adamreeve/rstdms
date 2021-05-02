@@ -2,8 +2,8 @@ use crate::error::{Result, TdmsReadError};
 use crate::object_map::ObjectMap;
 use crate::object_path::{ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
-use crate::toc::{TocFlag, TocMask};
 use crate::segment::{RawDataIndex, RawDataIndexCache, SegmentObject, TdmsSegment};
+use crate::toc::{TocFlag, TocMask};
 use crate::types::{LittleEndianReader, NativeType, TdsType, TypeReader};
 use id_arena::Arena;
 use std::collections::HashMap;
@@ -205,7 +205,7 @@ impl TdmsReader {
                     }
                     None => {
                         return Err(TdmsReadError::TdmsError(String::from(
-                            "Object has no previous raw data index"
+                            "Object has no previous raw data index",
                         )))
                     }
                 },

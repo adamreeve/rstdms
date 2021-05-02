@@ -4,6 +4,7 @@ use crate::object_map::ObjectMap;
 use crate::object_path::ObjectPathId;
 use crate::toc::{TocFlag, TocMask};
 use crate::types::{NativeType, TdsType};
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use id_arena::{Arena, Id};
 use std::io::{Read, Seek, SeekFrom};
 
@@ -37,14 +38,37 @@ impl TdmsSegment {
         buffer: &mut Vec<T>,
         raw_data_indexes: &Arena<RawDataIndex>,
     ) -> Result<()> {
-        if self.toc_mask.has_flag(TocFlag::InterleavedData) {
-            self.read_interleaved_channel_data(reader, channel_id, buffer, raw_data_indexes)
-        } else {
-            self.read_contiguous_channel_data(reader, channel_id, buffer, raw_data_indexes)
+        let interleaved = self.toc_mask.has_flag(TocFlag::InterleavedData);
+        let big_endian = self.toc_mask.has_flag(TocFlag::BigEndian);
+        match (interleaved, big_endian) {
+            (false, false) => self.read_contiguous_channel_data::<_, _, LittleEndian>(
+                reader,
+                channel_id,
+                buffer,
+                raw_data_indexes,
+            ),
+            (false, true) => self.read_contiguous_channel_data::<_, _, BigEndian>(
+                reader,
+                channel_id,
+                buffer,
+                raw_data_indexes,
+            ),
+            (true, false) => self.read_interleaved_channel_data::<_, _, LittleEndian>(
+                reader,
+                channel_id,
+                buffer,
+                raw_data_indexes,
+            ),
+            (true, true) => self.read_interleaved_channel_data::<_, _, BigEndian>(
+                reader,
+                channel_id,
+                buffer,
+                raw_data_indexes,
+            ),
         }
     }
 
-    fn read_contiguous_channel_data<R: Read + Seek, T: NativeType>(
+    fn read_contiguous_channel_data<R: Read + Seek, T: NativeType, O: ByteOrder>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
@@ -57,7 +81,11 @@ impl TdmsSegment {
                 let raw_data_index = raw_data_indexes.get(raw_data_index_id).unwrap();
                 if obj.object_id == channel_id {
                     reader.seek(SeekFrom::Start(self.data_position + channel_offset))?;
-                    T::read_values(buffer, reader, raw_data_index.number_of_values as usize)?;
+                    T::read_values::<_, O>(
+                        buffer,
+                        reader,
+                        raw_data_index.number_of_values as usize,
+                    )?;
                     break;
                 } else {
                     channel_offset += raw_data_index.data_size;
@@ -67,7 +95,7 @@ impl TdmsSegment {
         Ok(())
     }
 
-    fn read_interleaved_channel_data<R: Read + Seek, T: NativeType>(
+    fn read_interleaved_channel_data<R: Read + Seek, T: NativeType, O: ByteOrder>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
@@ -114,7 +142,7 @@ impl TdmsSegment {
                 type_size as usize,
                 channel_offset as usize,
             );
-            T::read_values(buffer, &mut interleaved_reader, length as usize)?;
+            T::read_values::<_, O>(buffer, &mut interleaved_reader, length as usize)?;
         }
         Ok(())
     }

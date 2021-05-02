@@ -1,5 +1,5 @@
 use crate::error::{Result, TdmsReadError};
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{ByteOrder, ReadBytesExt};
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
 use std::io::Read;
@@ -210,7 +210,7 @@ pub trait NativeType: private::SealedNativeType + Sized {
     fn native_type() -> NativeTypeId;
 
     #[doc(hidden)]
-    fn read_values<R: Read>(
+    fn read_values<R: Read, O: ByteOrder>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -222,12 +222,16 @@ impl NativeType for i8 {
         NativeTypeId::I8
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_i8_into(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -236,12 +240,16 @@ impl NativeType for i16 {
         NativeTypeId::I16
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_i16_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -250,7 +258,7 @@ impl NativeType for i32 {
         NativeTypeId::I32
     }
 
-    fn read_values<R: Read>(
+    fn read_values<R: Read, O: ByteOrder>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -258,7 +266,7 @@ impl NativeType for i32 {
         let original_length = target_buffer.len();
         let new_length = original_length + num_values;
         target_buffer.resize(new_length, 0);
-        reader.read_i32_into::<LittleEndian>(&mut target_buffer[original_length..new_length])?;
+        reader.read_i32_into::<O>(&mut target_buffer[original_length..new_length])?;
         Ok(())
     }
 }
@@ -268,12 +276,16 @@ impl NativeType for i64 {
         NativeTypeId::I64
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_i64_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -282,12 +294,16 @@ impl NativeType for u8 {
         NativeTypeId::U8
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_exact(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -296,12 +312,16 @@ impl NativeType for u16 {
         NativeTypeId::U16
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_u16_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -310,12 +330,16 @@ impl NativeType for u32 {
         NativeTypeId::U32
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_u32_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -324,12 +348,16 @@ impl NativeType for u64 {
         NativeTypeId::U64
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0);
+        reader.read_u64_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -338,12 +366,16 @@ impl NativeType for f32 {
         NativeTypeId::F32
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0.0);
+        reader.read_f32_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
@@ -352,12 +384,16 @@ impl NativeType for f64 {
         NativeTypeId::F64
     }
 
-    fn read_values<R: Read>(
-        _target_buffer: &mut Vec<Self>,
-        _reader: &mut R,
-        _num_values: usize,
+    fn read_values<R: Read, O: ByteOrder>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
     ) -> Result<()> {
-        unimplemented!();
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, 0.0);
+        reader.read_f64_into::<O>(&mut target_buffer[original_length..new_length])?;
+        Ok(())
     }
 }
 
