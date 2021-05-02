@@ -1,4 +1,5 @@
 use crate::error::{Result, TdmsReadError};
+use crate::interleaved::InterleavedReader;
 use crate::object_map::ObjectMap;
 use crate::object_path::{ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
@@ -23,6 +24,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<TdmsReader> {
 
 #[derive(Debug)]
 struct TdmsSegment {
+    toc_mask: TocMask,
     data_position: u64,
     next_segment_position: u64,
     objects: Vec<SegmentObject>,
@@ -30,11 +32,13 @@ struct TdmsSegment {
 
 impl TdmsSegment {
     fn new(
+        toc_mask: TocMask,
         data_position: u64,
         next_segment_position: u64,
         objects: Vec<SegmentObject>,
     ) -> TdmsSegment {
         TdmsSegment {
+            toc_mask,
             data_position,
             next_segment_position,
             objects,
@@ -42,6 +46,20 @@ impl TdmsSegment {
     }
 
     fn read_channel_data<R: Read + Seek, T: NativeType>(
+        &self,
+        reader: &mut R,
+        channel_id: ObjectPathId,
+        buffer: &mut Vec<T>,
+        raw_data_indexes: &Arena<RawDataIndex>,
+    ) -> Result<()> {
+        if self.toc_mask.has_flag(TocFlag::InterleavedData) {
+            self.read_interleaved_channel_data(reader, channel_id, buffer, raw_data_indexes)
+        } else {
+            self.read_contiguous_channel_data(reader, channel_id, buffer, raw_data_indexes)
+        }
+    }
+
+    fn read_contiguous_channel_data<R: Read + Seek, T: NativeType>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
@@ -60,6 +78,58 @@ impl TdmsSegment {
                     channel_offset += raw_data_index.data_size;
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn read_interleaved_channel_data<R: Read + Seek, T: NativeType>(
+        &self,
+        reader: &mut R,
+        channel_id: ObjectPathId,
+        buffer: &mut Vec<T>,
+        raw_data_indexes: &Arena<RawDataIndex>,
+    ) -> Result<()> {
+        let mut length = None;
+        let mut channel_params = None;
+        let mut chunk_width = 0;
+
+        for obj in self.objects.iter() {
+            if let Some(raw_data_index_id) = obj.raw_data_index {
+                let raw_data_index = raw_data_indexes.get(raw_data_index_id).unwrap();
+                let type_size = raw_data_index.data_type.size().ok_or_else(|| {
+                    TdmsReadError::TdmsError(format!(
+                        "Cannot read unsized data type {:?} in interleaved data chunk",
+                        raw_data_index.data_type
+                    ))
+                })?;
+                match length {
+                    None => length = Some(raw_data_index.number_of_values),
+                    Some(length) => {
+                        if raw_data_index.number_of_values != length {
+                            return Err(TdmsReadError::TdmsError(format!(
+                                "Different data lengths in interleaved data segment. Expected length {} but got {}",
+                                length, raw_data_index.number_of_values)));
+                        }
+                    }
+                }
+                if obj.object_id == channel_id {
+                    channel_params = Some((type_size, chunk_width));
+                }
+                chunk_width += type_size;
+            }
+        }
+
+        if let (Some((type_size, channel_offset)), Some(length)) = (channel_params, length) {
+            let mut chunk = vec![0; (length as usize) * (chunk_width as usize)];
+            reader.seek(SeekFrom::Start(self.data_position))?;
+            reader.read_exact(&mut chunk)?;
+            let mut interleaved_reader = InterleavedReader::new(
+                &chunk,
+                chunk_width as usize,
+                type_size as usize,
+                channel_offset as usize,
+            );
+            T::read_values(buffer, &mut interleaved_reader, length as usize)?;
         }
         Ok(())
     }
@@ -256,6 +326,7 @@ impl TdmsReader {
         self.update_data_indexes(&segment_objects)?;
 
         Ok(Some(TdmsSegment::new(
+            toc_mask,
             raw_data_position,
             next_segment_position,
             segment_objects,
