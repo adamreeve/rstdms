@@ -204,7 +204,7 @@ impl TdmsReader {
                         SegmentObject::with_data(object_id, *raw_data_index_id)
                     }
                     None => {
-                        return Err(TdmsReadError::TdmsError(format!(
+                        return Err(TdmsReadError::TdmsError(String::from(
                             "Object has no previous raw data index"
                         )))
                     }
@@ -224,7 +224,7 @@ impl TdmsReader {
                 let property = TdmsProperty::read(reader)?;
                 self.properties
                     .entry(object_id)
-                    .or_insert_with(|| Vec::new())
+                    .or_insert_with(Vec::new)
                     .push(property);
             }
         }
@@ -233,7 +233,7 @@ impl TdmsReader {
     }
 
     /// Update the channel data indexes with data indexes for the current objects in a segment
-    fn update_data_indexes(&mut self, segment_objects: &Vec<SegmentObject>) -> Result<()> {
+    fn update_data_indexes(&mut self, segment_objects: &[SegmentObject]) -> Result<()> {
         for segment_obj in segment_objects {
             if let Some(segment_data_index_id) = segment_obj.raw_data_index {
                 // If we have a valid raw data index id it must correspond to a raw data index

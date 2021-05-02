@@ -110,10 +110,7 @@ fn read_metadata() {
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
-    assert!(
-        tdms_file.is_ok(),
-        format!("Got error: {:?}", tdms_file.unwrap_err())
-    );
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
 
     let mut tdms_file = tdms_file.unwrap();
     let mut group = tdms_file.group("Group").unwrap();
@@ -144,10 +141,7 @@ fn read_metadata_with_repeated_raw_data_index() {
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
-    assert!(
-        tdms_file.is_ok(),
-        format!("Got error: {:?}", tdms_file.unwrap_err())
-    );
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
 
     let mut tdms_file = tdms_file.unwrap();
     let mut group = tdms_file.group("Group").unwrap();
@@ -172,10 +166,7 @@ fn multiple_channels() {
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
-    assert!(
-        tdms_file.is_ok(),
-        format!("Got error: {:?}", tdms_file.unwrap_err())
-    );
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
 
     let mut tdms_file = tdms_file.unwrap();
     let mut group = tdms_file.group("Group").unwrap();
@@ -205,10 +196,7 @@ fn interleaved_data() {
 
     let tdms_file = TdmsFile::new(test_file.to_cursor());
 
-    assert!(
-        tdms_file.is_ok(),
-        format!("Got error: {:?}", tdms_file.unwrap_err())
-    );
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
 
     let mut tdms_file = tdms_file.unwrap();
     let mut group = tdms_file.group("Group").unwrap();
