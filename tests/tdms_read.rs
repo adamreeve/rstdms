@@ -210,3 +210,28 @@ fn interleaved_data() {
         assert_eq!(data, expected_data[i]);
     }
 }
+
+#[test]
+fn iterate_over_objects() {
+    let mut test_file = TestFile::new();
+    let no_data = hex!("FF FF FF FF");
+    let metadata_bytes = metadata(vec![
+        object_metadata("/'Group1'", &no_data, Vec::new()),
+        object_metadata("/'Group2'", &no_data, Vec::new()),
+    ]);
+    let data_bytes = Vec::new();
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
+
+    let mut tdms_file = tdms_file.unwrap();
+    for mut group in tdms_file.groups() {
+        println!("{:?}", group);
+        for channel in group.channels() {
+            println!("{:?}", channel);
+        }
+    }
+}

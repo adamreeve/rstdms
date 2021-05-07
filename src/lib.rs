@@ -34,6 +34,14 @@ pub struct Channel<'a, R: Read + Seek> {
     object_id: ObjectPathId,
 }
 
+pub struct GroupIterator<'a, R: Read + Seek> {
+    _file: &'a mut TdmsFile<R>,
+}
+
+pub struct ChannelIterator<'a, R: Read + Seek> {
+    _file: &'a mut TdmsFile<R>,
+}
+
 impl<R: Read + Seek> TdmsFile<R> {
     /// Create a new TdmsFile object, parsing TDMS metadata from the reader
     pub fn new(reader: R) -> Result<TdmsFile<R>> {
@@ -53,6 +61,11 @@ impl<R: Read + Seek> TdmsFile<R> {
             // path entry exists when any channel path is created?
             None => Some(Group::new(self, group_name, None)),
         }
+    }
+
+    /// Get an iterator over groups within this TDMS file
+    pub fn groups<'a>(&'a mut self) -> GroupIterator<'a, R> {
+        GroupIterator { _file: self }
     }
 }
 
@@ -76,6 +89,11 @@ impl<'a, R: Read + Seek> Group<'a, R> {
             Some(object_id) => Some(Channel::new(self.file, object_id)),
             None => None,
         }
+    }
+
+    /// Get an iterator over channels within this group
+    pub fn channels<'b>(&'b mut self) -> ChannelIterator<'b, R> {
+        ChannelIterator { _file: self.file }
     }
 }
 
@@ -124,8 +142,36 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
     }
 }
 
+impl<'a, R: Read + Seek> Iterator for GroupIterator<'a, R> {
+    type Item = Group<'a, R>;
+
+    fn next(&mut self) -> Option<Group<'a, R>> {
+        None
+    }
+}
+
+impl<'a, R: Read + Seek> Iterator for ChannelIterator<'a, R> {
+    type Item = Channel<'a, R>;
+
+    fn next(&mut self) -> Option<Channel<'a, R>> {
+        None
+    }
+}
+
 impl<R: Read + Seek> std::fmt::Debug for TdmsFile<R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TdmsFile").finish()
+    }
+}
+
+impl<'a, R: Read + Seek> std::fmt::Debug for Group<'a, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Group").finish()
+    }
+}
+
+impl<'a, R: Read + Seek> std::fmt::Debug for Channel<'a, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Group").finish()
     }
 }
