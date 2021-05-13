@@ -55,11 +55,19 @@ mod test {
     #[test]
     fn set_and_get() {
         let mut path_cache = ObjectPathCache::new();
-        let root_obj = path_cache.get_or_create_id(String::from("/"));
-        let group_obj = path_cache.get_or_create_id(String::from("/'group'"));
-        let channel_1 = path_cache.get_or_create_id(String::from("/'group'/'channel_1'"));
-        let channel_2 = path_cache.get_or_create_id(String::from("/'group'/'channel_2'"));
-        let channel_3 = path_cache.get_or_create_id(String::from("/'group'/'channel_3'"));
+        let root_obj = path_cache.get_or_create_id(String::from("/")).unwrap();
+        let group_obj = path_cache
+            .get_or_create_id(String::from("/'group'"))
+            .unwrap();
+        let channel_1 = path_cache
+            .get_or_create_id(String::from("/'group'/'channel_1'"))
+            .unwrap();
+        let channel_2 = path_cache
+            .get_or_create_id(String::from("/'group'/'channel_2'"))
+            .unwrap();
+        let channel_3 = path_cache
+            .get_or_create_id(String::from("/'group'/'channel_3'"))
+            .unwrap();
 
         let mut object_map = ObjectMap::new();
         object_map.set(group_obj, 1);
@@ -76,7 +84,9 @@ mod test {
     #[test]
     fn overwrite() {
         let mut path_cache = ObjectPathCache::new();
-        let channel_1 = path_cache.get_or_create_id(String::from("/'group'/'channel_1'"));
+        let channel_1 = path_cache
+            .get_or_create_id(String::from("/'group'/'channel_1'"))
+            .unwrap();
 
         let mut object_map = ObjectMap::new();
         object_map.set(channel_1, 2);
@@ -88,7 +98,9 @@ mod test {
     #[test]
     fn clear() {
         let mut path_cache = ObjectPathCache::new();
-        let channel_1 = path_cache.get_or_create_id(String::from("/'group'/'channel_1'"));
+        let channel_1 = path_cache
+            .get_or_create_id(String::from("/'group'/'channel_1'"))
+            .unwrap();
 
         let mut object_map = ObjectMap::new();
         object_map.set(channel_1, 2);

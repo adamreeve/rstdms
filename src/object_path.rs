@@ -109,25 +109,25 @@ impl ObjectPath {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ObjectPathId(u32);
+pub struct ObjectPathId(usize);
 
 impl ObjectPathId {
     pub fn as_usize(&self) -> usize {
-        self.0 as usize
+        self.0
     }
 }
 
 #[derive(Debug)]
 pub struct ObjectPathCache {
     path_to_id: HashMap<String, ObjectPathId>,
-    next_id: u32,
+    id_to_path: Vec<ObjectPath>,
 }
 
 impl ObjectPathCache {
     pub fn new() -> ObjectPathCache {
         ObjectPathCache {
             path_to_id: HashMap::new(),
-            next_id: 0,
+            id_to_path: Vec::new(),
         }
     }
 
@@ -138,14 +138,31 @@ impl ObjectPathCache {
         }
     }
 
-    pub fn get_or_create_id(&mut self, object_path: String) -> ObjectPathId {
-        match self.path_to_id.entry(object_path) {
-            Entry::Occupied(occupied_entry) => *occupied_entry.get(),
+    pub fn get_or_create_id(&mut self, path: String) -> Result<ObjectPathId> {
+        let (path_id, created) = self.get_or_create_id_internal(path)?;
+        if created {
+            let group_path = match self.id_to_path.last().unwrap() {
+                // If we've created a new channel object, make sure the group object also exists
+                ObjectPath::Channel(ref group_name, _) => Some(path_from_group(group_name)),
+                _ => None,
+            };
+            if let Some(group_path) = group_path {
+                self.get_or_create_id_internal(group_path)?;
+            }
+        }
+        Ok(path_id)
+    }
+
+    fn get_or_create_id_internal(&mut self, path: String) -> Result<(ObjectPathId, bool)> {
+        match self.path_to_id.entry(path) {
+            Entry::Occupied(occupied_entry) => Ok((*occupied_entry.get(), false)),
             Entry::Vacant(vacant_entry) => {
-                let new_id = ObjectPathId(self.next_id);
-                self.next_id += 1;
+                let object_path = ObjectPath::parse(vacant_entry.key())?;
+                let next_id = self.id_to_path.len();
+                let new_id = ObjectPathId(next_id);
+                self.id_to_path.push(object_path);
                 vacant_entry.insert(new_id);
-                new_id
+                Ok((new_id, true))
             }
         }
     }
@@ -158,7 +175,7 @@ mod test {
     #[test]
     fn create_and_retrieve() {
         let mut object_path_cache = ObjectPathCache::new();
-        let object_id = object_path_cache.get_or_create_id("/".to_string());
+        let object_id = object_path_cache.get_or_create_id("/".to_string()).unwrap();
 
         let found_id = object_path_cache.get_id("/");
 
@@ -169,8 +186,10 @@ mod test {
     fn different_ids() {
         let mut object_path_cache = ObjectPathCache::new();
 
-        let object_id_0 = object_path_cache.get_or_create_id("/".to_string());
-        let object_id_1 = object_path_cache.get_or_create_id("/'group'".to_string());
+        let object_id_0 = object_path_cache.get_or_create_id("/".to_string()).unwrap();
+        let object_id_1 = object_path_cache
+            .get_or_create_id("/'group'".to_string())
+            .unwrap();
 
         assert_ne!(object_id_0, object_id_1);
     }

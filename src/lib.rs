@@ -25,7 +25,7 @@ pub struct TdmsFile<R: Read + Seek> {
 
 pub struct Group<'a, R: Read + Seek> {
     file: &'a mut TdmsFile<R>,
-    _object_id: Option<ObjectPathId>,
+    _object_id: ObjectPathId,
     name: &'a str,
 }
 
@@ -53,14 +53,9 @@ impl<R: Read + Seek> TdmsFile<R> {
     /// Get a group within the TDMS file
     pub fn group<'a>(&'a mut self, group_name: &'a str) -> Option<Group<'a, R>> {
         let group_path = path_from_group(group_name);
-        match self.metadata.get_object_id(&group_path) {
-            Some(object_id) => Some(Group::new(self, group_name, Some(object_id))),
-            // It's currently possible to have a group without an associated object path if there is no
-            // metadata associated with this group.
-            // TODO: We want to return None here if the group really doesn't exist, so make sure the group
-            // path entry exists when any channel path is created?
-            None => Some(Group::new(self, group_name, None)),
-        }
+        self.metadata
+            .get_object_id(&group_path)
+            .map(move |object_id| Group::new(self, group_name, object_id))
     }
 
     /// Get an iterator over groups within this TDMS file
@@ -70,11 +65,7 @@ impl<R: Read + Seek> TdmsFile<R> {
 }
 
 impl<'a, R: Read + Seek> Group<'a, R> {
-    fn new(
-        file: &'a mut TdmsFile<R>,
-        name: &'a str,
-        object_id: Option<ObjectPathId>,
-    ) -> Group<'a, R> {
+    fn new(file: &'a mut TdmsFile<R>, name: &'a str, object_id: ObjectPathId) -> Group<'a, R> {
         Group {
             file,
             _object_id: object_id,
@@ -85,10 +76,10 @@ impl<'a, R: Read + Seek> Group<'a, R> {
     /// Get a channel within this group
     pub fn channel<'b>(&'b mut self, channel_name: &str) -> Option<Channel<'b, R>> {
         let channel_path = path_from_channel(self.name, channel_name);
-        match self.file.metadata.get_object_id(&channel_path) {
-            Some(object_id) => Some(Channel::new(self.file, object_id)),
-            None => None,
-        }
+        self.file
+            .metadata
+            .get_object_id(&channel_path)
+            .map(move |object_id| Channel::new(self.file, object_id))
     }
 
     /// Get an iterator over channels within this group

@@ -195,7 +195,7 @@ impl TdmsReader {
         let mut segment_objects = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
             let object_path = reader.read_string()?;
-            let object_id = self.object_paths.get_or_create_id(object_path);
+            let object_id = self.object_paths.get_or_create_id(object_path)?;
             let raw_data_index_header = reader.read_uint32()?;
             let segment_object = match raw_data_index_header {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
