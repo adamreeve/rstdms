@@ -76,6 +76,10 @@ impl TdmsReader {
         self.object_paths.get_id(path)
     }
 
+    pub fn get_object_path(&self, object_path_id: ObjectPathId) -> Option<&ObjectPath> {
+        self.object_paths.get_path(object_path_id)
+    }
+
     pub fn objects(&self) -> impl Iterator<Item=(ObjectPathId, &ObjectPath)> {
         self.object_paths.objects()
     }

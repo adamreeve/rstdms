@@ -138,6 +138,16 @@ impl ObjectPathCache {
         }
     }
 
+    pub fn get_path(&self, object_path_id: ObjectPathId) -> Option<&ObjectPath> {
+        let index = object_path_id.as_usize();
+        if index < self.id_to_path.len() {
+            Some(&self.id_to_path[index])
+        }
+        else {
+            None
+        }
+    }
+
     pub fn get_or_create_id(&mut self, path: String) -> Result<ObjectPathId> {
         let (path_id, created) = self.get_or_create_id_internal(path)?;
         if created {

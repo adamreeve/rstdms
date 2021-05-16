@@ -16,32 +16,32 @@ use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPath, ObjectPathId};
 use crate::tdms_reader::{read_metadata, TdmsReader};
 pub use crate::types::NativeType;
+use std::cell::RefCell;
 use std::io::{BufReader, Read, Seek};
 
 pub struct TdmsFile<R: Read + Seek> {
-    file_reader: BufReader<R>,
+    file_reader: RefCell<BufReader<R>>,
     tdms_reader: TdmsReader,
 }
 
 pub struct Group<'a, R: Read + Seek> {
-    file: &'a mut TdmsFile<R>,
-    _object_id: ObjectPathId,
-    name: &'a str,
+    file: &'a TdmsFile<R>,
+    object_id: ObjectPathId,
 }
 
 pub struct Channel<'a, R: Read + Seek> {
-    file: &'a mut TdmsFile<R>,
+    file: &'a TdmsFile<R>,
     object_id: ObjectPathId,
 }
 
 pub struct GroupIterator<'a, R: Read + Seek> {
-    file: &'a mut TdmsFile<R>,
-    group_objects: Vec<ObjectPathId>,
-    current_index: usize,
+    file: &'a TdmsFile<R>,
+    object_iterator: std::vec::IntoIter<ObjectPathId>,
 }
 
 pub struct ChannelIterator<'a, R: Read + Seek> {
-    _file: &'a mut TdmsFile<R>,
+    file: &'a TdmsFile<R>,
+    object_iterator: std::vec::IntoIter<ObjectPathId>,
 }
 
 impl<R: Read + Seek> TdmsFile<R> {
@@ -49,35 +49,43 @@ impl<R: Read + Seek> TdmsFile<R> {
     pub fn new(file_reader: R) -> Result<TdmsFile<R>> {
         let mut file_reader = BufReader::new(file_reader);
         let tdms_reader = read_metadata(&mut file_reader)?;
-        Ok(TdmsFile { file_reader, tdms_reader })
+        Ok(TdmsFile { file_reader: RefCell::new(file_reader), tdms_reader })
     }
 
     /// Get a group within the TDMS file
-    pub fn group<'a>(&'a mut self, group_name: &'a str) -> Option<Group<'a, R>> {
+    pub fn group<'a>(&'a self, group_name: &'a str) -> Option<Group<'a, R>> {
         let group_path = path_from_group(group_name);
         self.tdms_reader
             .get_object_id(&group_path)
-            .map(move |object_id| Group::new(self, group_name, object_id))
+            .map(move |object_id| Group::new(self, object_id))
     }
 
     /// Get an iterator over groups within this TDMS file
-    pub fn groups<'a>(&'a mut self) -> GroupIterator<'a, R> {
+    pub fn groups<'a>(&'a self) -> GroupIterator<'a, R> {
         GroupIterator::new(self)
     }
 }
 
 impl<'a, R: Read + Seek> Group<'a, R> {
-    fn new(file: &'a mut TdmsFile<R>, name: &'a str, object_id: ObjectPathId) -> Group<'a, R> {
+    fn new(file: &'a TdmsFile<R>, object_id: ObjectPathId) -> Group<'a, R> {
         Group {
             file,
-            _object_id: object_id,
-            name,
+            object_id,
+        }
+    }
+
+    /// Get the name of this group
+    pub fn name(&self) -> &str {
+        let group_path = self.file.tdms_reader.get_object_path(self.object_id).unwrap();
+        match group_path {
+            ObjectPath::Group(ref group_name) => group_name,
+            _ => panic!("Expected a group path for object id {:?}, got {:?}", self.object_id, group_path),
         }
     }
 
     /// Get a channel within this group
-    pub fn channel<'b>(&'b mut self, channel_name: &str) -> Option<Channel<'b, R>> {
-        let channel_path = path_from_channel(self.name, channel_name);
+    pub fn channel<'b>(&'b self, channel_name: &str) -> Option<Channel<'b, R>> {
+        let channel_path = path_from_channel(self.name(), channel_name);
         self.file
             .tdms_reader
             .get_object_id(&channel_path)
@@ -85,13 +93,13 @@ impl<'a, R: Read + Seek> Group<'a, R> {
     }
 
     /// Get an iterator over channels within this group
-    pub fn channels<'b>(&'b mut self) -> ChannelIterator<'b, R> {
-        ChannelIterator { _file: self.file }
+    pub fn channels<'b>(&'b self) -> ChannelIterator<'b, R> {
+        ChannelIterator::new(self.file, self.name())
     }
 }
 
 impl<'a, R: Read + Seek> Channel<'a, R> {
-    fn new(file: &'a mut TdmsFile<R>, object_id: ObjectPathId) -> Channel<'a, R> {
+    fn new(file: &'a TdmsFile<R>, object_id: ObjectPathId) -> Channel<'a, R> {
         Channel { file, object_id }
     }
 
@@ -104,7 +112,7 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
     }
 
     /// Read all data for this channel into the given buffer.
-    pub fn read_data<T: NativeType>(&'a mut self, buffer: &mut Vec<T>) -> Result<()> {
+    pub fn read_data<T: NativeType>(&'a self, buffer: &mut Vec<T>) -> Result<()> {
         match self.file.tdms_reader.get_channel_data_index(self.object_id) {
             Some(channel_data_index) => {
                 let tdms_type = channel_data_index.data_type;
@@ -114,7 +122,7 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
                         // Buffer type matches expected native type, safe to read data
                         buffer.reserve(channel_data_index.number_of_values as usize);
                         self.file.tdms_reader.read_channel_data(
-                            &mut self.file.file_reader,
+                            &mut *self.file.file_reader.borrow_mut(),
                             self.object_id,
                             buffer,
                         )?;
@@ -136,8 +144,8 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
 }
 
 impl <'a, R: Read + Seek> GroupIterator<'a, R> {
-    fn new(file: &'a mut TdmsFile<R>) -> GroupIterator<'a, R> {
-        let group_objects = file.tdms_reader.objects()
+    fn new(file: &'a TdmsFile<R>) -> GroupIterator<'a, R> {
+        let group_objects: Vec<ObjectPathId> = file.tdms_reader.objects()
             .filter(|(_, path)| match path {
                 ObjectPath::Group(_) => true,
                 _ => false,
@@ -146,8 +154,7 @@ impl <'a, R: Read + Seek> GroupIterator<'a, R> {
             .collect();
         GroupIterator {
             file,
-            group_objects,
-            current_index: 0
+            object_iterator: group_objects.into_iter(),
         }
     }
 }
@@ -156,12 +163,22 @@ impl<'a, R: Read + Seek> Iterator for GroupIterator<'a, R> {
     type Item = Group<'a, R>;
 
     fn next(&mut self) -> Option<Group<'a, R>> {
-        self.current_index += 1;
-        if self.current_index <= self.group_objects.len() {
-            Some(Group::new(self.file, "", self.group_objects[self.current_index - 1]))
-        }
-        else {
-            None
+        self.object_iterator.next().map(|object_id| Group::new(self.file, object_id))
+    }
+}
+
+impl <'a, R: Read + Seek> ChannelIterator<'a, R> {
+    fn new(file: &'a TdmsFile<R>, group_name: &str) -> ChannelIterator<'a, R> {
+        let channel_objects: Vec<ObjectPathId> = file.tdms_reader.objects()
+            .filter(|(_, path)| match path {
+                ObjectPath::Channel(g, _) if g == group_name => true,
+                _ => false,
+            })
+            .map(|(id, _)| id)
+            .collect();
+        ChannelIterator {
+            file,
+            object_iterator: channel_objects.into_iter(),
         }
     }
 }
@@ -170,7 +187,7 @@ impl<'a, R: Read + Seek> Iterator for ChannelIterator<'a, R> {
     type Item = Channel<'a, R>;
 
     fn next(&mut self) -> Option<Channel<'a, R>> {
-        None
+        self.object_iterator.next().map(|object_id| Channel::new(self.file, object_id))
     }
 }
 
