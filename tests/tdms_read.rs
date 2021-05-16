@@ -217,9 +217,13 @@ fn iterate_over_objects() {
     let no_data = hex!("FF FF FF FF");
     let metadata_bytes = metadata(vec![
         object_metadata("/'Group1'", &no_data, Vec::new()),
+        object_metadata("/'Group1'/'Channel1_1'", &raw_data_index(3, 1), Vec::new()),
+        object_metadata("/'Group1'/'Channel1_2'", &raw_data_index(3, 1), Vec::new()),
         object_metadata("/'Group2'", &no_data, Vec::new()),
+        object_metadata("/'Group2'/'Channel2_1'", &raw_data_index(3, 1), Vec::new()),
+        object_metadata("/'Group2'/'Channel2_2'", &raw_data_index(3, 1), Vec::new()),
     ]);
-    let data_bytes = Vec::new();
+    let data_bytes = data_bytes_i32(vec![1, 2, 3, 4]);
     let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST;
     test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
 
@@ -228,10 +232,15 @@ fn iterate_over_objects() {
     assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
 
     let tdms_file = tdms_file.unwrap();
-    for group in tdms_file.groups() {
-        println!("{:?}", group);
-        for channel in group.channels() {
-            println!("{:?}", channel);
+    let expected_groups = vec!["Group1", "Group2"];
+    let expected_channels = vec![
+        vec!["Channel1_1", "Channel1_2"],
+        vec!["Channel2_1", "Channel2_2"],
+    ];
+    for (group_idx, group) in tdms_file.groups().enumerate() {
+        assert_eq!(group.name(), expected_groups[group_idx]);
+        for (channel_idx, channel) in group.channels().enumerate() {
+            assert_eq!(channel.name(), expected_channels[group_idx][channel_idx]);
         }
     }
 }

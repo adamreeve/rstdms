@@ -110,6 +110,22 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
         Channel { file, object_id }
     }
 
+    /// Get the name of this channel
+    pub fn name(&self) -> &str {
+        let channel_path = self
+            .file
+            .tdms_reader
+            .get_object_path(self.object_id)
+            .unwrap();
+        match channel_path {
+            ObjectPath::Channel(_, ref channel_name) => channel_name,
+            _ => panic!(
+                "Expected a channel path for object id {:?}, got {:?}",
+                self.object_id, channel_path
+            ),
+        }
+    }
+
     /// Get the total number of values in this channel
     pub fn len(&'a self) -> u64 {
         match self.file.tdms_reader.get_channel_data_index(self.object_id) {
