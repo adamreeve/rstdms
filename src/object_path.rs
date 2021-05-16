@@ -142,8 +142,7 @@ impl ObjectPathCache {
         let index = object_path_id.as_usize();
         if index < self.id_to_path.len() {
             Some(&self.id_to_path[index])
-        }
-        else {
+        } else {
             None
         }
     }
@@ -163,8 +162,11 @@ impl ObjectPathCache {
         Ok(path_id)
     }
 
-    pub fn objects(&self) -> impl Iterator<Item=(ObjectPathId, &ObjectPath)> {
-        self.id_to_path.iter().enumerate().map(|(i, path)| (ObjectPathId(i), path))
+    pub fn objects(&self) -> impl Iterator<Item = (ObjectPathId, &ObjectPath)> {
+        self.id_to_path
+            .iter()
+            .enumerate()
+            .map(|(i, path)| (ObjectPathId(i), path))
     }
 
     fn get_or_create_id_internal(&mut self, path: String) -> Result<(ObjectPathId, bool)> {
