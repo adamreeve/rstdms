@@ -153,6 +153,10 @@ impl ObjectPathCache {
         Ok(path_id)
     }
 
+    pub fn objects(&self) -> impl Iterator<Item=(ObjectPathId, &ObjectPath)> {
+        self.id_to_path.iter().enumerate().map(|(i, path)| (ObjectPathId(i), path))
+    }
+
     fn get_or_create_id_internal(&mut self, path: String) -> Result<(ObjectPathId, bool)> {
         match self.path_to_id.entry(path) {
             Entry::Occupied(occupied_entry) => Ok((*occupied_entry.get(), false)),

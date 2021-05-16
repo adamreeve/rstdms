@@ -1,6 +1,6 @@
 use crate::error::{Result, TdmsReadError};
 use crate::object_map::ObjectMap;
-use crate::object_path::{ObjectPathCache, ObjectPathId};
+use crate::object_path::{ObjectPathCache, ObjectPath, ObjectPathId};
 use crate::properties::TdmsProperty;
 use crate::segment::{RawDataIndex, RawDataIndexCache, SegmentObject, TdmsSegment};
 use crate::toc::{TocFlag, TocMask};
@@ -74,6 +74,10 @@ impl TdmsReader {
 
     pub fn get_object_id(&self, path: &str) -> Option<ObjectPathId> {
         self.object_paths.get_id(path)
+    }
+
+    pub fn objects(&self) -> impl Iterator<Item=(ObjectPathId, &ObjectPath)> {
+        self.object_paths.objects()
     }
 
     pub fn get_channel_data_index(&self, object_id: ObjectPathId) -> Option<&ChannelDataIndex> {
