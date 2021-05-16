@@ -156,16 +156,13 @@ impl TdmsReader {
         // TODO: Check endianness from ToC mask
         let mut type_reader = LittleEndianReader::new(reader);
 
-        let version = type_reader.read_int32()?;
+        let _version = type_reader.read_int32()?;
         let next_segment_offset = type_reader.read_uint64()?;
         let raw_data_offset = type_reader.read_uint64()?;
 
         let lead_in_length = 28;
         let next_segment_position = position + lead_in_length + next_segment_offset;
         let raw_data_position = position + lead_in_length + raw_data_offset;
-
-        println!("Read segment with toc_mask = {}, version = {}, next_segment_offset = {}, raw_data_offset = {}",
-                toc_mask, version, next_segment_offset, raw_data_offset);
 
         let segment_objects = if toc_mask.has_flag(TocFlag::MetaData) {
             let this_segment_objects = self.read_object_metadata(&mut type_reader)?;
