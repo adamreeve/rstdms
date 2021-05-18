@@ -3,8 +3,8 @@ use crate::interleaved::InterleavedReader;
 use crate::object_map::ObjectMap;
 use crate::object_path::ObjectPathId;
 use crate::toc::{TocFlag, TocMask};
-use crate::types::{NativeType, TdsType};
-use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use crate::types::{ByteOrderWrapper, NativeType, TdsType};
+use byteorder::{BigEndian, LittleEndian};
 use id_arena::{Arena, Id};
 use std::io::{Read, Seek, SeekFrom};
 
@@ -68,7 +68,7 @@ impl TdmsSegment {
         }
     }
 
-    fn read_contiguous_channel_data<R: Read + Seek, T: NativeType, O: ByteOrder>(
+    fn read_contiguous_channel_data<R: Read + Seek, T: NativeType, O: ByteOrderWrapper>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
@@ -95,7 +95,7 @@ impl TdmsSegment {
         Ok(())
     }
 
-    fn read_interleaved_channel_data<R: Read + Seek, T: NativeType, O: ByteOrder>(
+    fn read_interleaved_channel_data<R: Read + Seek, T: NativeType, O: ByteOrderWrapper>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,

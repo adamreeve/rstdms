@@ -9,6 +9,7 @@ mod object_path;
 mod properties;
 mod segment;
 mod tdms_reader;
+mod timestamp;
 mod toc;
 mod types;
 

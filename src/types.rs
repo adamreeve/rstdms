@@ -1,5 +1,6 @@
 use crate::error::{Result, TdmsReadError};
-use byteorder::{ByteOrder, ReadBytesExt};
+use crate::timestamp::Timestamp;
+use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
 use num_enum::TryFromPrimitive;
 use std::convert::TryFrom;
 use std::io::Read;
@@ -29,6 +30,22 @@ pub enum TdsType {
     ComplexSingleFloat = 0x08000C,
     ComplexDoubleFloat = 0x10000D,
     DaqmxRawData = 0xFFFFFFFF,
+}
+
+pub trait ByteOrderWrapper: ByteOrder {
+    fn is_little_endian() -> bool;
+}
+
+impl ByteOrderWrapper for LittleEndian {
+    fn is_little_endian() -> bool {
+        true
+    }
+}
+
+impl ByteOrderWrapper for BigEndian {
+    fn is_little_endian() -> bool {
+        false
+    }
 }
 
 impl TdsType {
@@ -83,7 +100,7 @@ impl TdsType {
             TdsType::ExtendedFloatWithUnit => None,
             TdsType::String => None,
             TdsType::Boolean => None,
-            TdsType::TimeStamp => None,
+            TdsType::TimeStamp => Some(NativeTypeId::Timestamp),
             TdsType::FixedPoint => None,
             TdsType::ComplexSingleFloat => None,
             TdsType::ComplexDoubleFloat => None,
@@ -104,6 +121,7 @@ pub trait TypeReader {
     fn read_float32(&mut self) -> Result<f32>;
     fn read_float64(&mut self) -> Result<f64>;
     fn read_string(&mut self) -> Result<String>;
+    fn read_timestamp(&mut self) -> Result<Timestamp>;
 }
 
 pub struct LittleEndianReader<'a, R: Read> {
@@ -186,6 +204,16 @@ impl<'a, R: Read> TypeReader for LittleEndianReader<'a, R> {
         self.reader.read_exact(&mut string_bytes)?;
         Ok(String::from_utf8(string_bytes)?)
     }
+
+    fn read_timestamp(&mut self) -> Result<Timestamp> {
+        let mut buffer = [0; 8];
+        self.reader.read_exact(&mut buffer)?;
+        let second_fractions = u64::from_le_bytes(buffer);
+        let mut buffer = [0; 8];
+        self.reader.read_exact(&mut buffer)?;
+        let seconds = i64::from_le_bytes(buffer);
+        Ok(Timestamp::new(seconds, second_fractions))
+    }
 }
 
 /// Represents a native rust type that TDMS channel data can be read as.
@@ -201,6 +229,7 @@ pub enum NativeTypeId {
     U64,
     F32,
     F64,
+    Timestamp,
 }
 
 /// A native rust type that TDMS channel data can be read as.
@@ -210,7 +239,7 @@ pub trait NativeType: private::SealedNativeType + Sized {
     fn native_type() -> NativeTypeId;
 
     #[doc(hidden)]
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -222,7 +251,7 @@ impl NativeType for i8 {
         NativeTypeId::I8
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -240,7 +269,7 @@ impl NativeType for i16 {
         NativeTypeId::I16
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -258,7 +287,7 @@ impl NativeType for i32 {
         NativeTypeId::I32
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -276,7 +305,7 @@ impl NativeType for i64 {
         NativeTypeId::I64
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -294,7 +323,7 @@ impl NativeType for u8 {
         NativeTypeId::U8
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -312,7 +341,7 @@ impl NativeType for u16 {
         NativeTypeId::U16
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -330,7 +359,7 @@ impl NativeType for u32 {
         NativeTypeId::U32
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -348,7 +377,7 @@ impl NativeType for u64 {
         NativeTypeId::U64
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -366,7 +395,7 @@ impl NativeType for f32 {
         NativeTypeId::F32
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -384,7 +413,7 @@ impl NativeType for f64 {
         NativeTypeId::F64
     }
 
-    fn read_values<R: Read, O: ByteOrder>(
+    fn read_values<R: Read, O: ByteOrderWrapper>(
         target_buffer: &mut Vec<Self>,
         reader: &mut R,
         num_values: usize,
@@ -397,7 +426,37 @@ impl NativeType for f64 {
     }
 }
 
+impl NativeType for Timestamp {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::Timestamp
+    }
+
+    fn read_values<R: Read, O: ByteOrderWrapper>(
+        target_buffer: &mut Vec<Self>,
+        reader: &mut R,
+        num_values: usize,
+    ) -> Result<()> {
+        let original_length = target_buffer.len();
+        let new_length = original_length + num_values;
+        target_buffer.resize(new_length, Timestamp::new(0, 0));
+        for _ in 0..num_values {
+            if O::is_little_endian() {
+                let second_fractions = reader.read_u64::<O>()?;
+                let seconds = reader.read_i64::<O>()?;
+                target_buffer.push(Timestamp::new(seconds, second_fractions));
+            } else {
+                let seconds = reader.read_i64::<O>()?;
+                let second_fractions = reader.read_u64::<O>()?;
+                target_buffer.push(Timestamp::new(seconds, second_fractions));
+            }
+        }
+        Ok(())
+    }
+}
+
 mod private {
+    use crate::timestamp::Timestamp;
+
     pub trait SealedNativeType {}
 
     impl SealedNativeType for i8 {}
@@ -410,6 +469,7 @@ mod private {
     impl SealedNativeType for u64 {}
     impl SealedNativeType for f32 {}
     impl SealedNativeType for f64 {}
+    impl SealedNativeType for Timestamp {}
 }
 
 #[cfg(test)]

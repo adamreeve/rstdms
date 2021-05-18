@@ -1,4 +1,5 @@
 use crate::error::{Result, TdmsReadError};
+use crate::timestamp::Timestamp;
 
 use crate::types::{TdsType, TypeReader};
 
@@ -15,6 +16,7 @@ pub enum TdmsValue {
     Float32(f32),
     Float64(f64),
     String(String),
+    Timestamp(Timestamp),
 }
 
 #[derive(Debug, PartialEq)]
@@ -36,6 +38,7 @@ fn read_value<T: TypeReader>(type_id: TdsType, reader: &mut T) -> Result<TdmsVal
         TdsType::SingleFloat => Ok(TdmsValue::Float32(reader.read_float32()?)),
         TdsType::DoubleFloat => Ok(TdmsValue::Float64(reader.read_float64()?)),
         TdsType::String => Ok(TdmsValue::String(reader.read_string()?)),
+        TdsType::TimeStamp => Ok(TdmsValue::Timestamp(reader.read_timestamp()?)),
         _ => Err(TdmsReadError::TdmsError(format!(
             "Unsupported property type {:?}",
             type_id
@@ -100,6 +103,24 @@ mod test {
             property.value,
             TdmsValue::String(String::from("property value"))
         );
+    }
+
+    #[test]
+    pub fn can_read_timestamp_property() {
+        let mut cursor = Cursor::new(hex!(
+            "
+            0D 00 00 00
+            70 72 6F 70 65 72 74 79 20 6E 61 6D 65
+            44 00 00 00
+            01 00 00 00 00 00 00 00
+            02 00 00 00 00 00 00 00
+            "
+        ));
+        let mut reader = LittleEndianReader::new(&mut cursor);
+        let property = TdmsProperty::read(&mut reader).unwrap();
+
+        assert_eq!(property.name, "property name");
+        assert_eq!(property.value, TdmsValue::Timestamp(Timestamp::new(2, 1)));
     }
 
     #[test]

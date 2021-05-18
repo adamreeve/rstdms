@@ -6,7 +6,7 @@ use std::fs::File;
 
 fn main() {
     match main_impl() {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(message) => {
             eprintln!("{}", message);
             std::process::exit(1);
