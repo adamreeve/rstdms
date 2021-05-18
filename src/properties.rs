@@ -60,6 +60,7 @@ impl TdmsProperty {
 mod test {
     extern crate hex_literal;
 
+    use chrono::{Duration, TimeZone, Utc};
     use hex_literal::hex;
     use std::io::Cursor;
 
@@ -112,15 +113,27 @@ mod test {
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
             44 00 00 00
-            01 00 00 00 00 00 00 00
-            02 00 00 00 00 00 00 00
+            00 08 89 A1 8C A9 54 AB
+            7B 63 14 D2 00 00 00 00
             "
         ));
         let mut reader = LittleEndianReader::new(&mut cursor);
         let property = TdmsProperty::read(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
-        assert_eq!(property.value, TdmsValue::Timestamp(Timestamp::new(2, 1)));
+        assert_eq!(
+            property.value,
+            TdmsValue::Timestamp(Timestamp::new(3524551547, 1234567890 * 10u64.pow(10)))
+        );
+
+        if let TdmsValue::Timestamp(ts) = property.value {
+            let expected_time = Utc
+                .ymd(2015, 9, 8)
+                .and_hms(10, 5, 47)
+                .checked_add_signed(Duration::nanoseconds(669260594))
+                .unwrap();
+            assert_eq!(ts.to_datetime(), Some(expected_time));
+        }
     }
 
     #[test]

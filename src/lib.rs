@@ -1,4 +1,5 @@
 extern crate byteorder;
+extern crate chrono;
 extern crate id_arena;
 extern crate num_enum;
 

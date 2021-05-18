@@ -9,6 +9,7 @@ byteorder = "1.4.3"
 num_enum = "0.5.1"
 id-arena = "2.2.1"
 clap = "2.33.0"
+chrono = "0.4.19"
 
 [dev-dependencies]
 hex-literal = "0.3.1"
