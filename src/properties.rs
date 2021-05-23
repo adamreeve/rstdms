@@ -1,7 +1,9 @@
 use crate::error::{Result, TdmsReadError};
 use crate::timestamp::Timestamp;
+use byteorder::ReadBytesExt;
+use std::io::Read;
 
-use crate::types::{TdsType, TypeReader};
+use crate::types::{read_string, read_timestamp, ByteOrderExt, TdsType};
 
 #[derive(Debug, PartialEq)]
 pub enum TdmsValue {
@@ -25,20 +27,20 @@ pub struct TdmsProperty {
     pub value: TdmsValue,
 }
 
-fn read_value<T: TypeReader>(type_id: TdsType, reader: &mut T) -> Result<TdmsValue> {
+fn read_value<R: Read, O: ByteOrderExt>(type_id: TdsType, reader: &mut R) -> Result<TdmsValue> {
     match type_id {
-        TdsType::I8 => Ok(TdmsValue::Int8(reader.read_int8()?)),
-        TdsType::I16 => Ok(TdmsValue::Int16(reader.read_int16()?)),
-        TdsType::I32 => Ok(TdmsValue::Int32(reader.read_int32()?)),
-        TdsType::I64 => Ok(TdmsValue::Int64(reader.read_int64()?)),
-        TdsType::U8 => Ok(TdmsValue::Uint8(reader.read_uint8()?)),
-        TdsType::U16 => Ok(TdmsValue::Uint16(reader.read_uint16()?)),
-        TdsType::U32 => Ok(TdmsValue::Uint32(reader.read_uint32()?)),
-        TdsType::U64 => Ok(TdmsValue::Uint64(reader.read_uint64()?)),
-        TdsType::SingleFloat => Ok(TdmsValue::Float32(reader.read_float32()?)),
-        TdsType::DoubleFloat => Ok(TdmsValue::Float64(reader.read_float64()?)),
-        TdsType::String => Ok(TdmsValue::String(reader.read_string()?)),
-        TdsType::TimeStamp => Ok(TdmsValue::Timestamp(reader.read_timestamp()?)),
+        TdsType::I8 => Ok(TdmsValue::Int8(reader.read_i8()?)),
+        TdsType::I16 => Ok(TdmsValue::Int16(reader.read_i16::<O>()?)),
+        TdsType::I32 => Ok(TdmsValue::Int32(reader.read_i32::<O>()?)),
+        TdsType::I64 => Ok(TdmsValue::Int64(reader.read_i64::<O>()?)),
+        TdsType::U8 => Ok(TdmsValue::Uint8(reader.read_u8()?)),
+        TdsType::U16 => Ok(TdmsValue::Uint16(reader.read_u16::<O>()?)),
+        TdsType::U32 => Ok(TdmsValue::Uint32(reader.read_u32::<O>()?)),
+        TdsType::U64 => Ok(TdmsValue::Uint64(reader.read_u64::<O>()?)),
+        TdsType::SingleFloat => Ok(TdmsValue::Float32(reader.read_f32::<O>()?)),
+        TdsType::DoubleFloat => Ok(TdmsValue::Float64(reader.read_f64::<O>()?)),
+        TdsType::String => Ok(TdmsValue::String(read_string::<R, O>(reader)?)),
+        TdsType::TimeStamp => Ok(TdmsValue::Timestamp(read_timestamp::<R, O>(reader)?)),
         _ => Err(TdmsReadError::TdmsError(format!(
             "Unsupported property type {:?}",
             type_id
@@ -47,11 +49,11 @@ fn read_value<T: TypeReader>(type_id: TdsType, reader: &mut T) -> Result<TdmsVal
 }
 
 impl TdmsProperty {
-    pub fn read<T: TypeReader>(reader: &mut T) -> Result<TdmsProperty> {
-        let name = reader.read_string()?;
-        let type_id_raw = reader.read_uint32()?;
+    pub fn read<R: Read, O: ByteOrderExt>(reader: &mut R) -> Result<TdmsProperty> {
+        let name = read_string::<R, O>(reader)?;
+        let type_id_raw = reader.read_u32::<O>()?;
         let type_id = TdsType::from_u32(type_id_raw)?;
-        let value = read_value(type_id, reader)?;
+        let value = read_value::<R, O>(type_id, reader)?;
         Ok(TdmsProperty { name, value })
     }
 }
@@ -60,17 +62,17 @@ impl TdmsProperty {
 mod test {
     extern crate hex_literal;
 
+    use byteorder::LittleEndian;
     use chrono::{Duration, TimeZone, Utc};
     use hex_literal::hex;
     use std::io::Cursor;
 
     use super::*;
     use crate::error::TdmsReadError;
-    use crate::types::LittleEndianReader;
 
     #[test]
     pub fn can_read_int32_property() {
-        let mut cursor = Cursor::new(hex!(
+        let mut reader = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
@@ -78,8 +80,7 @@ mod test {
             0A 00 00 00
             "
         ));
-        let mut reader = LittleEndianReader::new(&mut cursor);
-        let property = TdmsProperty::read(&mut reader).unwrap();
+        let property = TdmsProperty::read::<_, LittleEndian>(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
         assert_eq!(property.value, TdmsValue::Int32(10i32));
@@ -87,7 +88,7 @@ mod test {
 
     #[test]
     pub fn can_read_string_property() {
-        let mut cursor = Cursor::new(hex!(
+        let mut reader = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
@@ -96,8 +97,7 @@ mod test {
             70 72 6F 70 65 72 74 79 20 76 61 6C 75 65
             "
         ));
-        let mut reader = LittleEndianReader::new(&mut cursor);
-        let property = TdmsProperty::read(&mut reader).unwrap();
+        let property = TdmsProperty::read::<_, LittleEndian>(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
         assert_eq!(
@@ -108,7 +108,7 @@ mod test {
 
     #[test]
     pub fn can_read_timestamp_property() {
-        let mut cursor = Cursor::new(hex!(
+        let mut reader = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72 74 79 20 6E 61 6D 65
@@ -117,8 +117,7 @@ mod test {
             7B 63 14 D2 00 00 00 00
             "
         ));
-        let mut reader = LittleEndianReader::new(&mut cursor);
-        let property = TdmsProperty::read(&mut reader).unwrap();
+        let property = TdmsProperty::read::<_, LittleEndian>(&mut reader).unwrap();
 
         assert_eq!(property.name, "property name");
         assert_eq!(
@@ -138,14 +137,13 @@ mod test {
 
     #[test]
     pub fn unexpected_end_of_data() {
-        let mut cursor = Cursor::new(hex!(
+        let mut reader = Cursor::new(hex!(
             "
             0D 00 00 00
             70 72 6F 70 65 72
             "
         ));
-        let mut reader = LittleEndianReader::new(&mut cursor);
-        let error = TdmsProperty::read(&mut reader).unwrap_err();
+        let error = TdmsProperty::read::<_, LittleEndian>(&mut reader).unwrap_err();
 
         match error {
             TdmsReadError::IoError(_) => {}
@@ -155,14 +153,13 @@ mod test {
 
     #[test]
     pub fn invalid_utf8() {
-        let mut cursor = Cursor::new(hex!(
+        let mut reader = Cursor::new(hex!(
             "
             0D 00 00 00
             FF FF FF FF FF FF FF FF FF FF FF FF FF
             "
         ));
-        let mut reader = LittleEndianReader::new(&mut cursor);
-        let error = TdmsProperty::read(&mut reader).unwrap_err();
+        let error = TdmsProperty::read::<_, LittleEndian>(&mut reader).unwrap_err();
 
         match error {
             TdmsReadError::Utf8Error(_) => {}

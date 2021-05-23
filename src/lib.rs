@@ -10,13 +10,14 @@ mod object_path;
 mod properties;
 mod segment;
 mod tdms_reader;
-mod timestamp;
+pub mod timestamp;
 mod toc;
 mod types;
 
 use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPath, ObjectPathId};
 use crate::tdms_reader::{read_metadata, TdmsReader};
+pub use crate::timestamp::Timestamp;
 pub use crate::types::NativeType;
 use std::cell::RefCell;
 use std::io::{BufReader, Read, Seek};

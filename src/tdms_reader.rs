@@ -4,7 +4,8 @@ use crate::object_path::{ObjectPath, ObjectPathCache, ObjectPathId};
 use crate::properties::TdmsProperty;
 use crate::segment::{RawDataIndex, RawDataIndexCache, SegmentObject, TdmsSegment};
 use crate::toc::{TocFlag, TocMask};
-use crate::types::{LittleEndianReader, NativeType, TdsType, TypeReader};
+use crate::types::{read_string, ByteOrderExt, NativeType, TdsType};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use id_arena::Arena;
 use std::collections::HashMap;
 use std::io::{Read, Seek, SeekFrom};
@@ -150,22 +151,32 @@ impl TdmsReader {
             )));
         }
 
-        let mut type_reader = LittleEndianReader::new(reader);
-        let toc_mask = TocMask::from_flags(type_reader.read_uint32()?);
+        let toc_mask = TocMask::from_flags(reader.read_u32::<LittleEndian>()?);
 
-        // TODO: Check endianness from ToC mask
-        let mut type_reader = LittleEndianReader::new(reader);
+        if toc_mask.has_flag(TocFlag::BigEndian) {
+            self.read_segment_metadata::<R, BigEndian>(reader, toc_mask, position, object_merger)
+        } else {
+            self.read_segment_metadata::<R, LittleEndian>(reader, toc_mask, position, object_merger)
+        }
+    }
 
-        let _version = type_reader.read_int32()?;
-        let next_segment_offset = type_reader.read_uint64()?;
-        let raw_data_offset = type_reader.read_uint64()?;
+    fn read_segment_metadata<R: Read + Seek, O: ByteOrderExt>(
+        &mut self,
+        reader: &mut R,
+        toc_mask: TocMask,
+        position: u64,
+        object_merger: &mut ObjectMerger,
+    ) -> Result<Option<TdmsSegment>> {
+        let _version = reader.read_i32::<O>()?;
+        let next_segment_offset = reader.read_u64::<O>()?;
+        let raw_data_offset = reader.read_u64::<O>()?;
 
         let lead_in_length = 28;
         let next_segment_position = position + lead_in_length + next_segment_offset;
         let raw_data_position = position + lead_in_length + raw_data_offset;
 
         let segment_objects = if toc_mask.has_flag(TocFlag::MetaData) {
-            let this_segment_objects = self.read_object_metadata(&mut type_reader)?;
+            let this_segment_objects = self.read_object_metadata::<R, O>(reader)?;
             if toc_mask.has_flag(TocFlag::NewObjList) {
                 this_segment_objects
             } else {
@@ -192,16 +203,16 @@ impl TdmsReader {
         )))
     }
 
-    fn read_object_metadata<R: TypeReader>(
+    fn read_object_metadata<R: Read, O: ByteOrderExt>(
         &mut self,
         reader: &mut R,
     ) -> Result<Vec<SegmentObject>> {
-        let num_objects = reader.read_uint32()?;
+        let num_objects = reader.read_u32::<O>()?;
         let mut segment_objects = Vec::with_capacity(num_objects as usize);
         for _ in 0..num_objects {
-            let object_path = reader.read_string()?;
+            let object_path = read_string::<R, O>(reader)?;
             let object_id = self.object_paths.get_or_create_id(object_path)?;
-            let raw_data_index_header = reader.read_uint32()?;
+            let raw_data_index_header = reader.read_u32::<O>()?;
             let segment_object = match raw_data_index_header {
                 RAW_DATA_INDEX_NO_DATA => SegmentObject::no_data(object_id),
                 RAW_DATA_INDEX_MATCHES_PREVIOUS => match self.raw_data_index_cache.get(object_id) {
@@ -218,15 +229,17 @@ impl TdmsReader {
                 DIGITAL_LINE_SCALER => unimplemented!(),
                 _ => {
                     // Raw data index header gives length of index information
-                    let raw_data_index = self.data_indexes.alloc(read_raw_data_index(reader)?);
+                    let raw_data_index = self
+                        .data_indexes
+                        .alloc(read_raw_data_index::<R, O>(reader)?);
                     self.raw_data_index_cache.set(object_id, raw_data_index);
                     SegmentObject::with_data(object_id, raw_data_index)
                 }
             };
             segment_objects.push(segment_object);
-            let num_properties = reader.read_uint32()?;
+            let num_properties = reader.read_u32::<O>()?;
             for _ in 0..num_properties {
-                let property = TdmsProperty::read(reader)?;
+                let property = TdmsProperty::read::<_, O>(reader)?;
                 self.properties
                     .entry(object_id)
                     .or_insert_with(Vec::new)
@@ -306,11 +319,11 @@ impl ObjectMerger {
     }
 }
 
-fn read_raw_data_index<R: TypeReader>(reader: &mut R) -> Result<RawDataIndex> {
-    let data_type = reader.read_uint32()?;
+fn read_raw_data_index<R: Read, O: ByteOrderExt>(reader: &mut R) -> Result<RawDataIndex> {
+    let data_type = reader.read_u32::<O>()?;
     let data_type = TdsType::from_u32(data_type)?;
-    let dimension = reader.read_uint32()?;
-    let number_of_values = reader.read_uint64()?;
+    let dimension = reader.read_u32::<O>()?;
+    let number_of_values = reader.read_u64::<O>()?;
 
     if dimension != 1 {
         return Err(TdmsReadError::TdmsError(format!(
@@ -323,7 +336,7 @@ fn read_raw_data_index<R: TypeReader>(reader: &mut R) -> Result<RawDataIndex> {
         Some(type_size) => (type_size as u64) * number_of_values,
         None => {
             if data_type == TdsType::String {
-                reader.read_uint64()?
+                reader.read_u64::<O>()?
             } else {
                 return Err(TdmsReadError::TdmsError(format!(
                     "Unsupported data type: {:?}",
