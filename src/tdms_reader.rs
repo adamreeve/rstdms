@@ -93,15 +93,21 @@ impl TdmsReader {
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<T>,
+        buffer: &mut [T],
     ) -> Result<()> {
+        let mut offset = 0;
         for segment in self.segments.iter() {
             if segment
                 .objects
                 .iter()
                 .any(|o| o.object_id == channel_id && o.raw_data_index.is_some())
             {
-                segment.read_channel_data(reader, channel_id, buffer, &self.data_indexes)?;
+                offset += segment.read_channel_data(
+                    reader,
+                    channel_id,
+                    &mut buffer[offset..],
+                    &self.data_indexes,
+                )?;
             }
         }
         Ok(())

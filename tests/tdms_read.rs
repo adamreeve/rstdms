@@ -115,8 +115,8 @@ fn read_metadata() {
     let tdms_file = tdms_file.unwrap();
     let group = tdms_file.group("Group").unwrap();
     let channel = group.channel("Channel1").unwrap();
-    let mut data: Vec<i32> = Vec::new();
-    channel.read_data(&mut data).unwrap();
+    let mut data: Vec<i32> = vec![0; channel.len() as usize];
+    channel.read_all_data(&mut data[..]).unwrap();
 
     assert_eq!(data, vec![1, 2, 3]);
 }
@@ -146,8 +146,8 @@ fn read_metadata_with_repeated_raw_data_index() {
     let tdms_file = tdms_file.unwrap();
     let group = tdms_file.group("Group").unwrap();
     let channel = group.channel("Channel1").unwrap();
-    let mut data: Vec<i32> = Vec::new();
-    channel.read_data(&mut data).unwrap();
+    let mut data: Vec<i32> = vec![0; channel.len() as usize];
+    channel.read_all_data(&mut data[..]).unwrap();
 
     assert_eq!(data, vec![1, 2, 3, 1, 2, 3]);
 }
@@ -175,8 +175,8 @@ fn multiple_channels() {
 
     for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
         let channel = group.channel(channel_name).unwrap();
-        let mut data: Vec<i32> = Vec::new();
-        channel.read_data(&mut data).unwrap();
+        let mut data: Vec<i32> = vec![0; channel.len() as usize];
+        channel.read_all_data(&mut data[..]).unwrap();
         assert_eq!(data, expected_data[i]);
     }
 }
@@ -205,8 +205,8 @@ fn interleaved_data() {
 
     for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
         let channel = group.channel(channel_name).unwrap();
-        let mut data: Vec<i32> = Vec::new();
-        channel.read_data(&mut data).unwrap();
+        let mut data: Vec<i32> = vec![0; channel.len() as usize];
+        channel.read_all_data(&mut data[..]).unwrap();
         assert_eq!(data, expected_data[i]);
     }
 }

@@ -35,9 +35,9 @@ impl TdmsSegment {
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<T>,
+        buffer: &mut [T],
         raw_data_indexes: &Arena<RawDataIndex>,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let interleaved = self.toc_mask.has_flag(TocFlag::InterleavedData);
         let big_endian = self.toc_mask.has_flag(TocFlag::BigEndian);
         match (interleaved, big_endian) {
@@ -72,9 +72,9 @@ impl TdmsSegment {
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<T>,
+        buffer: &mut [T],
         raw_data_indexes: &Arena<RawDataIndex>,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let mut channel_offset = 0;
         for obj in self.objects.iter() {
             if let Some(raw_data_index_id) = obj.raw_data_index {
@@ -86,22 +86,22 @@ impl TdmsSegment {
                         reader,
                         raw_data_index.number_of_values as usize,
                     )?;
-                    break;
+                    return Ok(raw_data_index.number_of_values as usize);
                 } else {
                     channel_offset += raw_data_index.data_size;
                 }
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     fn read_interleaved_channel_data<R: Read + Seek, T: NativeType, O: ByteOrderExt>(
         &self,
         reader: &mut R,
         channel_id: ObjectPathId,
-        buffer: &mut Vec<T>,
+        buffer: &mut [T],
         raw_data_indexes: &Arena<RawDataIndex>,
-    ) -> Result<()> {
+    ) -> Result<usize> {
         let mut length = None;
         let mut channel_params = None;
         let mut chunk_width = 0;
@@ -143,8 +143,10 @@ impl TdmsSegment {
                 channel_offset as usize,
             );
             T::read_values::<_, O>(buffer, &mut interleaved_reader, length as usize)?;
+            Ok(length as usize)
+        } else {
+            Ok(0)
         }
-        Ok(())
     }
 }
 

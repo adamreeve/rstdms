@@ -138,15 +138,21 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
     }
 
     /// Read all data for this channel into the given buffer.
-    pub fn read_data<T: NativeType>(&'a self, buffer: &mut Vec<T>) -> Result<()> {
+    pub fn read_all_data<T: NativeType>(&'a self, buffer: &mut [T]) -> Result<()> {
         match self.file.tdms_reader.get_channel_data_index(self.object_id) {
             Some(channel_data_index) => {
+                if channel_data_index.number_of_values > buffer.len() as u64 {
+                    return Err(TdmsReadError::TdmsError(format!(
+                        "Buffer length needs to be at least {}, received a buffer with length {}",
+                        channel_data_index.number_of_values,
+                        buffer.len()
+                    )));
+                }
                 let tdms_type = channel_data_index.data_type;
                 let expected_native_type = tdms_type.native_type();
                 match expected_native_type {
                     Some(expected_native_type) if expected_native_type == T::native_type() => {
                         // Buffer type matches expected native type, safe to read data
-                        buffer.reserve(channel_data_index.number_of_values as usize);
                         self.file.tdms_reader.read_channel_data(
                             &mut *self.file.file_reader.borrow_mut(),
                             self.object_id,
