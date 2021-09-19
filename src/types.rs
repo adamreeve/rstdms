@@ -82,7 +82,7 @@ impl TdsType {
             TdsType::SingleFloatWithUnit => Some(NativeTypeId::F32),
             TdsType::DoubleFloatWithUnit => Some(NativeTypeId::F64),
             TdsType::ExtendedFloatWithUnit => None,
-            TdsType::String => None,
+            TdsType::String => Some(NativeTypeId::String),
             TdsType::Boolean => None,
             TdsType::TimeStamp => Some(NativeTypeId::Timestamp),
             TdsType::FixedPoint => None,
@@ -106,6 +106,7 @@ pub enum NativeTypeId {
     U64,
     F32,
     F64,
+    String,
     Timestamp,
 }
 
@@ -273,6 +274,29 @@ impl NativeType for f64 {
     }
 }
 
+impl NativeType for String {
+    fn native_type() -> NativeTypeId {
+        NativeTypeId::String
+    }
+
+    fn read_values<R: Read, O: ByteOrderExt>(
+        target_buffer: &mut [Self],
+        reader: &mut R,
+        num_values: usize,
+    ) -> Result<()> {
+        let mut string_lengths: Vec<u32> = Vec::new();
+        for _ in 0..num_values {
+            string_lengths.push(reader.read_u32::<O>()?);
+        }
+        for i in 0..num_values {
+            let mut string_bytes = vec![0; string_lengths[i] as usize];
+            reader.read_exact(&mut string_bytes)?;
+            target_buffer[i] = String::from_utf8(string_bytes)?;
+        }
+        Ok(())
+    }
+}
+
 impl NativeType for Timestamp {
     fn native_type() -> NativeTypeId {
         NativeTypeId::Timestamp
@@ -339,6 +363,7 @@ mod private {
     impl SealedNativeType for u64 {}
     impl SealedNativeType for f32 {}
     impl SealedNativeType for f64 {}
+    impl SealedNativeType for String {}
     impl SealedNativeType for Timestamp {}
 }
 

@@ -62,12 +62,23 @@ fn object_metadata(
     metadata_bytes
 }
 
-fn raw_data_index(data_type: u32, number_of_values: u64) -> Vec<u8> {
+fn raw_data_index(data_type: u32, num_values: u64) -> Vec<u8> {
+    raw_data_index_with_byte_len(data_type, num_values, None)
+}
+
+fn raw_data_index_with_byte_len(
+    data_type: u32,
+    num_values: u64,
+    num_bytes: Option<u64>,
+) -> Vec<u8> {
     let mut index_bytes = Vec::new();
     index_bytes.extend(&(20_u32.to_le_bytes())); // Raw data index length
     index_bytes.extend(&(data_type.to_le_bytes())); // Data type
     index_bytes.extend(&(1_u32.to_le_bytes())); // Dimension
-    index_bytes.extend(&(number_of_values.to_le_bytes())); // Number of values
+    index_bytes.extend(&(num_values.to_le_bytes())); // Number of values
+    if let Some(num_bytes) = num_bytes {
+        index_bytes.extend(&(num_bytes.to_le_bytes())); // Number of values
+    }
     index_bytes
 }
 
@@ -243,4 +254,39 @@ fn iterate_over_objects() {
             assert_eq!(channel.name(), expected_channels[group_idx][channel_idx]);
         }
     }
+}
+
+#[test]
+fn read_string_data() {
+    let strings = vec!["Hello", "World!"];
+    let byte_len = strings.iter().map(|s| s.len() as u64).sum();
+    let mut data_bytes = Vec::new();
+    for s in &strings {
+        data_bytes.extend((s.len() as u32).to_le_bytes());
+    }
+    for s in &strings {
+        data_bytes.extend(s.as_bytes());
+    }
+
+    let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![object_metadata(
+        "/'Group'/'Channel1'",
+        &raw_data_index_with_byte_len(0x20, 2, Some(byte_len)),
+        Vec::new(),
+    )]);
+
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
+
+    let tdms_file = tdms_file.unwrap();
+    let group = tdms_file.group("Group").unwrap();
+    let channel = group.channel("Channel1").unwrap();
+    let mut data: Vec<String> = vec![String::new(); channel.len() as usize];
+    channel.read_all_data(&mut data[..]).unwrap();
+
+    assert_eq!(data, vec!["Hello".to_string(), "World!".to_string()]);
 }
