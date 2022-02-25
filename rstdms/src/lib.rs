@@ -14,7 +14,7 @@ pub mod timestamp;
 mod toc;
 mod types;
 
-use crate::error::{Result, TdmsReadError};
+pub use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPath, ObjectPathId};
 use crate::tdms_reader::{read_metadata, TdmsReader};
 pub use crate::timestamp::Timestamp;
