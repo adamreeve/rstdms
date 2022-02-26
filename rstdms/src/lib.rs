@@ -16,6 +16,7 @@ mod types;
 
 pub use crate::error::{Result, TdmsReadError};
 use crate::object_path::{path_from_channel, path_from_group, ObjectPath, ObjectPathId};
+pub use crate::properties::{TdmsProperty, TdmsValue};
 use crate::tdms_reader::{read_metadata, TdmsReader};
 pub use crate::timestamp::Timestamp;
 pub use crate::types::NativeType;
@@ -58,6 +59,17 @@ impl<R: Read + Seek> TdmsFile<R> {
         })
     }
 
+    pub fn properties(&self) -> &Vec<TdmsProperty> {
+        if let Some(object_id) = self.tdms_reader.get_object_id("/") {
+            match self.tdms_reader.properties.get(&object_id) {
+                Some(properties) => &properties,
+                None => &EMPTY_PROPERITES,
+            }
+        } else {
+            &EMPTY_PROPERITES
+        }
+    }
+
     /// Get a group within the TDMS file
     pub fn group<'a>(&'a self, group_name: &'a str) -> Option<Group<'a, R>> {
         let group_path = path_from_group(group_name);
@@ -90,6 +102,13 @@ impl<'a, R: Read + Seek> Group<'a, R> {
                 "Expected a group path for object id {:?}, got {:?}",
                 self.object_id, group_path
             ),
+        }
+    }
+
+    pub fn properties(&self) -> &Vec<TdmsProperty> {
+        match self.file.tdms_reader.properties.get(&self.object_id) {
+            Some(properties) => &properties,
+            None => &EMPTY_PROPERITES,
         }
     }
 
@@ -126,6 +145,13 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
                 "Expected a channel path for object id {:?}, got {:?}",
                 self.object_id, channel_path
             ),
+        }
+    }
+
+    pub fn properties(&self) -> &Vec<TdmsProperty> {
+        match self.file.tdms_reader.properties.get(&self.object_id) {
+            Some(properties) => &properties,
+            None => &EMPTY_PROPERITES,
         }
     }
 
@@ -248,3 +274,5 @@ impl<'a, R: Read + Seek> std::fmt::Debug for Channel<'a, R> {
         f.debug_struct("Group").finish()
     }
 }
+
+static EMPTY_PROPERITES: Vec<TdmsProperty> = Vec::new();

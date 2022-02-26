@@ -339,6 +339,7 @@ dependencies = [
 name = "rstdms-python"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "pyo3",
  "rstdms",
 ]

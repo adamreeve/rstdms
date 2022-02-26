@@ -2,8 +2,8 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Timestamp {
-    second_fractions: u64,
-    seconds: i64,
+    pub second_fractions: u64,
+    pub seconds: i64,
 }
 
 const FRACTIONS_PER_NS: u64 = 18446744073; // 2 ** 64 / 10 ** 9;
