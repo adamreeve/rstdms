@@ -1,14 +1,20 @@
 use chrono::{Datelike, Timelike};
 use std::fs::File;
+use std::io::{Read, Seek};
+use std::sync::Arc;
 use std::{error, fmt};
 
-use pyo3::exceptions::{PyException, PyValueError};
+use arrow2::array::{Array, PrimitiveArray};
+use arrow2::datatypes::Field;
+use arrow2::ffi::{export_array_to_c, export_field_to_c, Ffi_ArrowArray, Ffi_ArrowSchema};
+use arrow2::types::NativeType as ArrowNativeType;
+use pyo3::exceptions::{PyException, PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDateTime, PyDict};
 use rstdms::timestamp::Timestamp;
-use rstdms::{TdmsFile, TdmsReadError, TdmsValue};
+use rstdms::{Channel, NativeType, TdmsFile, TdmsReadError, TdmsValue};
 
-#[pyclass(name = "TdmsFile")]
+#[pyclass(name = "InternalTdmsFile")]
 struct PyTdmsFile {
     inner: TdmsFile<File>,
 }
@@ -95,6 +101,119 @@ impl PyTdmsFile {
             ))),
         }
     }
+
+    fn channel_data(
+        &self,
+        group_name: &str,
+        channel_name: &str,
+        schema_ptr_in: usize,
+        array_ptr_in: usize,
+    ) -> PyResult<()> {
+        let schema_ptr = schema_ptr_in as *mut Ffi_ArrowSchema;
+        let array_ptr = array_ptr_in as *mut Ffi_ArrowArray;
+        match self.inner.group(group_name) {
+            Some(group) => match group.channel(channel_name) {
+                Some(channel) => match channel.data_type() {
+                    rstdms::TdsType::Void => Err(PyValueError::new_err("channel has no data type")),
+                    rstdms::TdsType::I8 => {
+                        read_channel_data::<i8, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::I16 => {
+                        read_channel_data::<i16, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::I32 => {
+                        read_channel_data::<i32, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::I64 => {
+                        read_channel_data::<i64, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::U8 => {
+                        read_channel_data::<u8, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::U16 => {
+                        read_channel_data::<u16, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::U32 => {
+                        read_channel_data::<u32, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::U64 => {
+                        read_channel_data::<u64, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::SingleFloat => {
+                        read_channel_data::<f32, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::DoubleFloat => {
+                        read_channel_data::<f64, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::ExtendedFloat => Err(PyNotImplementedError::new_err(
+                        "Reading ExtendedFloat data is not implemented",
+                    )),
+                    rstdms::TdsType::SingleFloatWithUnit => {
+                        read_channel_data::<f32, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::DoubleFloatWithUnit => {
+                        read_channel_data::<f64, _>(&channel, schema_ptr, array_ptr)
+                    }
+                    rstdms::TdsType::ExtendedFloatWithUnit => Err(PyNotImplementedError::new_err(
+                        "Reading ExtendedFloat data is not implemented",
+                    )),
+                    rstdms::TdsType::String => Err(PyNotImplementedError::new_err(
+                        "Reading String data is not implemented",
+                    )),
+                    rstdms::TdsType::Boolean => Err(PyNotImplementedError::new_err(
+                        "Reading Boolean data is not implemented",
+                    )),
+                    rstdms::TdsType::TimeStamp => Err(PyNotImplementedError::new_err(
+                        "Reading TimeStamp data is not implemented",
+                    )),
+                    rstdms::TdsType::FixedPoint => Err(PyNotImplementedError::new_err(
+                        "Reading FixedPoint data is not implemented",
+                    )),
+                    rstdms::TdsType::ComplexSingleFloat => Err(PyNotImplementedError::new_err(
+                        "Reading ComplexSingleFloat data is not implemented",
+                    )),
+                    rstdms::TdsType::ComplexDoubleFloat => Err(PyNotImplementedError::new_err(
+                        "Reading ComplexDoubleFloat data is not implemented",
+                    )),
+                    rstdms::TdsType::DaqmxRawData => Err(PyNotImplementedError::new_err(
+                        "Reading DaqmxRawData is not implemented",
+                    )),
+                },
+                None => Err(PyValueError::new_err(format!(
+                    "Invalid channel name '{}'",
+                    channel_name
+                ))),
+            },
+            None => Err(PyValueError::new_err(format!(
+                "Invalid group name '{}'",
+                group_name
+            ))),
+        }
+    }
+}
+
+fn read_channel_data<T, TFile: Read + Seek>(
+    channel: &Channel<TFile>,
+    schema_ptr: *mut Ffi_ArrowSchema,
+    array_ptr: *mut Ffi_ArrowArray,
+) -> PyResult<()>
+where
+    T: NativeType + ArrowNativeType,
+    TFile: Read + Seek,
+{
+    let len = channel.len();
+    let mut data: Vec<T> = vec![Default::default(); len as usize];
+    channel
+        .read_all_data(&mut data)
+        .map_err(PyTdmsError::from)
+        .map_err(PyErr::from)?;
+    let array: Arc<dyn Array> = Arc::new(PrimitiveArray::from_vec(data));
+    let field = Field::new("data", array.data_type().clone(), false);
+    unsafe {
+        export_field_to_c(&field, schema_ptr);
+        export_array_to_c(array, array_ptr);
+    }
+    Ok(())
 }
 
 impl TdmsTimestamp {

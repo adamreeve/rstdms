@@ -19,7 +19,7 @@ use crate::object_path::{path_from_channel, path_from_group, ObjectPath, ObjectP
 pub use crate::properties::{TdmsProperty, TdmsValue};
 use crate::tdms_reader::{read_metadata, TdmsReader};
 pub use crate::timestamp::Timestamp;
-pub use crate::types::NativeType;
+pub use crate::types::{NativeType, TdsType};
 use std::cell::RefCell;
 use std::io::{BufReader, Read, Seek};
 
@@ -152,6 +152,13 @@ impl<'a, R: Read + Seek> Channel<'a, R> {
         match self.file.tdms_reader.properties.get(&self.object_id) {
             Some(properties) => &properties,
             None => &EMPTY_PROPERITES,
+        }
+    }
+
+    pub fn data_type(&'a self) -> TdsType {
+        match self.file.tdms_reader.get_channel_data_index(self.object_id) {
+            Some(channel_data_index) => channel_data_index.data_type,
+            None => TdsType::Void,
         }
     }
 

@@ -9,6 +9,7 @@ name = "rstdms"
 crate-type = ["cdylib"]
 
 [dependencies]
+arrow2 = "0.9.1"
+chrono = "0.4.19"
 pyo3 = { version = "0.15.1", features = ["extension-module"] }
 rstdms = { path = "../rstdms" }
-chrono = "0.4.19"
