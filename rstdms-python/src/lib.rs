@@ -8,7 +8,7 @@ use arrow2::array::{Array, PrimitiveArray};
 use arrow2::datatypes::Field;
 use arrow2::ffi::{export_array_to_c, export_field_to_c, Ffi_ArrowArray, Ffi_ArrowSchema};
 use arrow2::types::NativeType as ArrowNativeType;
-use pyo3::exceptions::{PyException, PyNotImplementedError, PyValueError};
+use pyo3::exceptions::{PyIOError, PyNotImplementedError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyDateTime, PyDict};
 use rstdms::timestamp::Timestamp;
@@ -309,6 +309,9 @@ impl From<TdmsReadError> for PyTdmsError {
 
 impl From<PyTdmsError> for PyErr {
     fn from(err: PyTdmsError) -> PyErr {
-        PyException::new_err(err.to_string())
+        match err {
+            PyTdmsError::TdmsReadError(TdmsReadError::IoError(_)) => PyIOError::new_err(err.to_string()),
+            PyTdmsError::TdmsReadError(_) => PyValueError::new_err(err.to_string()),
+        }
     }
 }

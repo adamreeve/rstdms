@@ -23,8 +23,8 @@ impl std::fmt::Display for TdmsReadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             TdmsReadError::TdmsError(ref s) => write!(f, "{}", s),
-            TdmsReadError::IoError(_) => write!(f, "IO error"),
-            TdmsReadError::Utf8Error(_) => write!(f, "UTF-8 decode error"),
+            TdmsReadError::IoError(ref e) => write!(f, "IO error: {}", e),
+            TdmsReadError::Utf8Error(ref e) => write!(f, "UTF-8 decode error: {}", e),
         }
     }
 }
