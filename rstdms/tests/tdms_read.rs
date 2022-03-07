@@ -259,7 +259,8 @@ fn iterate_over_objects() {
 #[test]
 fn read_string_data() {
     let strings = vec!["Hello", "World!"];
-    let byte_len = strings.iter().map(|s| s.len() as u64).sum();
+    // Total data size is the size of each string plus 4 bytes per string for the lengths
+    let byte_len = strings.iter().map(|s| s.len() as u64 + 4).sum();
     let mut data_bytes = Vec::new();
     for s in &strings {
         data_bytes.extend((s.len() as u32).to_le_bytes());
