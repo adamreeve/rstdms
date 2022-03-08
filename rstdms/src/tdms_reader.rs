@@ -29,14 +29,14 @@ pub struct ChannelDataIndex {
 }
 
 impl ChannelDataIndex {
-    fn from_segment_index(index: &RawDataIndex) -> ChannelDataIndex {
+    fn from_segment_index(index: &RawDataIndex, repetitions: u64) -> ChannelDataIndex {
         ChannelDataIndex {
             data_type: index.data_type,
-            number_of_values: index.number_of_values,
+            number_of_values: index.number_of_values * repetitions,
         }
     }
 
-    fn update_with_segment_index(&mut self, index: &RawDataIndex) -> Result<()> {
+    fn update_with_segment_index(&mut self, index: &RawDataIndex, repetitions: u64) -> Result<()> {
         // We have data in this segment for an object that already had data in a
         // previous segment, check the raw data index is compatible.
         if index.data_type != self.data_type {
@@ -45,7 +45,7 @@ impl ChannelDataIndex {
                 index.data_type, self.data_type
             )));
         }
-        self.number_of_values += index.number_of_values;
+        self.number_of_values += index.number_of_values * repetitions;
         Ok(())
     }
 }
@@ -199,14 +199,29 @@ impl TdmsReader {
             }
         };
 
-        self.update_data_indexes(&segment_objects)?;
+        let (data_size, repetitions) = self.compute_repetitions(&segment_objects, raw_data_position, next_segment_position);
+        self.update_data_indexes(&segment_objects, repetitions)?;
 
         Ok(Some(TdmsSegment::new(
             toc_mask,
             raw_data_position,
             next_segment_position,
             segment_objects,
+            data_size,
+            repetitions,
         )))
+    }
+
+    /// Determines the segment data size and number of times segment data is repeated before the next segment
+    fn compute_repetitions(&self, objects: &Vec<SegmentObject>, raw_data_position: u64, next_segment_position: u64) -> (u64, u64) {
+        let mut segment_size: u64 = 0;
+        for obj in objects {
+            if let Some(data_index_id) = obj.raw_data_index {
+                segment_size += self.data_indexes.get(data_index_id).unwrap().data_size;
+            }
+        }
+        let repetitions = (next_segment_position - raw_data_position + segment_size - 1) / segment_size;
+        (segment_size, repetitions)
     }
 
     fn read_object_metadata<R: Read, O: ByteOrderExt>(
@@ -257,7 +272,7 @@ impl TdmsReader {
     }
 
     /// Update the channel data indexes with data indexes for the current objects in a segment
-    fn update_data_indexes(&mut self, segment_objects: &[SegmentObject]) -> Result<()> {
+    fn update_data_indexes(&mut self, segment_objects: &[SegmentObject], repetitions: u64) -> Result<()> {
         for segment_obj in segment_objects {
             if let Some(segment_data_index_id) = segment_obj.raw_data_index {
                 // If we have a valid raw data index id it must correspond to a raw data index
@@ -267,11 +282,11 @@ impl TdmsReader {
                     self.channel_data_index_map.get_mut(segment_obj.object_id);
                 match existing_data_index {
                     Some(existing_data_index) => {
-                        existing_data_index.update_with_segment_index(segment_raw_data_index)?;
+                        existing_data_index.update_with_segment_index(segment_raw_data_index, repetitions)?;
                     }
                     None => {
                         let new_data_index =
-                            ChannelDataIndex::from_segment_index(segment_raw_data_index);
+                            ChannelDataIndex::from_segment_index(segment_raw_data_index, repetitions);
                         self.channel_data_index_map
                             .set(segment_obj.object_id, new_data_index);
                     }

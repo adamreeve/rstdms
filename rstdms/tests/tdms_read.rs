@@ -291,3 +291,67 @@ fn read_string_data() {
 
     assert_eq!(data, vec!["Hello".to_string(), "World!".to_string()]);
 }
+
+#[test]
+fn repeated_segment_data() {
+    let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![
+        object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 2), Vec::new()),
+        object_metadata("/'Group'/'Channel2'", &raw_data_index(3, 3), Vec::new()),
+        object_metadata("/'Group'/'Channel3'", &raw_data_index(3, 4), Vec::new()),
+    ]);
+    let data_bytes = data_bytes_i32((1..(9 * 3 + 1)).collect());
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
+
+    let tdms_file = tdms_file.unwrap();
+    let group = tdms_file.group("Group").unwrap();
+
+    let expected_data = vec![
+        vec![1, 2, 10, 11, 19, 20],
+        vec![3, 4, 5, 12, 13, 14, 21, 22, 23],
+        vec![6, 7, 8, 9, 15, 16, 17, 18, 24, 25, 26, 27]];
+
+    for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
+        let channel = group.channel(channel_name).unwrap();
+        let mut data: Vec<i32> = vec![0; channel.len() as usize];
+        channel.read_all_data(&mut data[..]).unwrap();
+        assert_eq!(data, expected_data[i]);
+    }
+}
+
+#[test]
+fn repeated_interleaved_segment_data() {
+    let mut test_file = TestFile::new();
+    let metadata_bytes = metadata(vec![
+        object_metadata("/'Group'/'Channel1'", &raw_data_index(3, 2), Vec::new()),
+        object_metadata("/'Group'/'Channel2'", &raw_data_index(3, 2), Vec::new()),
+        object_metadata("/'Group'/'Channel3'", &raw_data_index(3, 2), Vec::new()),
+    ]);
+    let data_bytes = data_bytes_i32((0..18).collect());
+    let toc_mask = TOC_METADATA | TOC_NEW_OBJ_LIST | TOC_RAW_DATA | TOC_INTERLEAVED_DATA;
+    test_file.add_segment(toc_mask, &metadata_bytes, &data_bytes);
+
+    let tdms_file = TdmsFile::new(test_file.to_cursor());
+
+    assert!(tdms_file.is_ok(), "Got error: {:?}", tdms_file.unwrap_err());
+
+    let tdms_file = tdms_file.unwrap();
+    let group = tdms_file.group("Group").unwrap();
+
+    let expected_data = vec![
+        vec![0, 3, 6, 9, 12, 15],
+        vec![1, 4, 7, 10, 13, 16],
+        vec![2, 5, 8, 11, 14, 17]];
+
+    for (i, channel_name) in vec!["Channel1", "Channel2", "Channel3"].iter().enumerate() {
+        let channel = group.channel(channel_name).unwrap();
+        let mut data: Vec<i32> = vec![0; channel.len() as usize];
+        channel.read_all_data(&mut data[..]).unwrap();
+        assert_eq!(data, expected_data[i]);
+    }
+}

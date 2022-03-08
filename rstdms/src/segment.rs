@@ -14,6 +14,8 @@ pub struct TdmsSegment {
     pub objects: Vec<SegmentObject>,
     toc_mask: TocMask,
     data_position: u64,
+    data_size: u64,
+    repetitions: u64,
 }
 
 impl TdmsSegment {
@@ -22,12 +24,17 @@ impl TdmsSegment {
         data_position: u64,
         next_segment_position: u64,
         objects: Vec<SegmentObject>,
+        data_size: u64,
+        repetitions: u64,
     ) -> TdmsSegment {
+        // Compute expected datasize
         TdmsSegment {
             toc_mask,
             data_position,
             next_segment_position,
             objects,
+            data_size,
+            repetitions,
         }
     }
 
@@ -80,13 +87,17 @@ impl TdmsSegment {
             if let Some(raw_data_index_id) = obj.raw_data_index {
                 let raw_data_index = raw_data_indexes.get(raw_data_index_id).unwrap();
                 if obj.object_id == channel_id {
-                    reader.seek(SeekFrom::Start(self.data_position + channel_offset))?;
-                    T::read_values::<_, O>(
-                        buffer,
-                        reader,
-                        raw_data_index.number_of_values as usize,
-                    )?;
-                    return Ok(raw_data_index.number_of_values as usize);
+                    for repeat_idx in 0..self.repetitions {
+                        let data_offset = repeat_idx * self.data_size;
+                        let buffer_offset = (repeat_idx * raw_data_index.number_of_values) as usize;
+                        reader.seek(SeekFrom::Start(self.data_position + data_offset + channel_offset))?;
+                        T::read_values::<_, O>(
+                            &mut buffer[buffer_offset..],
+                            reader,
+                            raw_data_index.number_of_values as usize,
+                        )?;
+                    }
+                    return Ok((self.repetitions * raw_data_index.number_of_values) as usize);
                 } else {
                     channel_offset += raw_data_index.data_size;
                 }
@@ -133,17 +144,21 @@ impl TdmsSegment {
         }
 
         if let (Some((type_size, channel_offset)), Some(length)) = (channel_params, length) {
-            let mut chunk = vec![0; (length as usize) * (chunk_width as usize)];
-            reader.seek(SeekFrom::Start(self.data_position))?;
-            reader.read_exact(&mut chunk)?;
-            let mut interleaved_reader = InterleavedReader::new(
-                &chunk,
-                chunk_width as usize,
-                type_size as usize,
-                channel_offset as usize,
-            );
-            T::read_values::<_, O>(buffer, &mut interleaved_reader, length as usize)?;
-            Ok(length as usize)
+            for repeat_idx in 0..self.repetitions {
+                let data_offset = repeat_idx * self.data_size;
+                let buffer_offset = (repeat_idx * length) as usize;
+                let mut chunk = vec![0; (length as usize) * (chunk_width as usize)];
+                reader.seek(SeekFrom::Start(self.data_position + data_offset))?;
+                reader.read_exact(&mut chunk)?;
+                let mut interleaved_reader = InterleavedReader::new(
+                    &chunk,
+                    chunk_width as usize,
+                    type_size as usize,
+                    channel_offset as usize,
+                );
+                T::read_values::<_, O>(&mut buffer[buffer_offset..], &mut interleaved_reader, length as usize)?;
+            }
+            Ok((length * self.repetitions) as usize)
         } else {
             Ok(0)
         }
